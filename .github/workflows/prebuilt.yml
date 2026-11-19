@@ -90,14 +90,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Deployment floors are fixed here, not taken from any consumer's
-          # setting: the lowest each slice builds at, so any app target links.
-          # Leaving the flag out would let the SDK default (the runner's OS
-          # version) leak into the archives.
-          - { suffix: macos-arm64,          target: darwin64-arm64,           smoke: "xcrun -sdk macosx cc",                      min: -mmacos-version-min=11.0 }
+          # One floor per platform, fixed here rather than taken from a
+          # consumer's setting: iOS 12.0, macOS 10.15. Two slices cannot be
+          # built that low and clang raises them on its own.
+          - { suffix: macos-arm64,          target: darwin64-arm64,           smoke: "xcrun -sdk macosx cc",                      min: -mmacos-version-min=10.15 }
           - { suffix: macos-x86_64,         target: darwin64-x86_64,          smoke: "xcrun -sdk macosx cc -arch x86_64",         min: -mmacos-version-min=10.15 }
           - { suffix: ios-arm64,            target: ios64-xcrun,              smoke: "xcrun -sdk iphoneos cc -arch arm64",        min: -mios-version-min=12.0 }
-          - { suffix: ios-simulator-arm64,  target: iossimulator-arm64-xcrun, smoke: "xcrun -sdk iphonesimulator cc -arch arm64", min: -mios-simulator-version-min=14.0 }
+          - { suffix: ios-simulator-arm64,  target: iossimulator-arm64-xcrun, smoke: "xcrun -sdk iphonesimulator cc -arch arm64", min: -mios-simulator-version-min=12.0 }
           - { suffix: ios-simulator-x86_64, target: iossimulator-x86_64-xcrun, smoke: "xcrun -sdk iphonesimulator cc -arch x86_64", min: -mios-simulator-version-min=12.0 }
     steps:
       - uses: actions/checkout@v4

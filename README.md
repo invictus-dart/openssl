@@ -33,19 +33,19 @@ one header that differs per triple, the rest are identical.
 | `android-arm` | `android-arm` | same |
 | `android-x86_64` | `android-x86_64` | same |
 | `android-x86` | `android-x86` | same |
-| `macos-arm64` | `darwin64-arm64` | macos-14, `-mmacos-version-min=11.0` |
+| `macos-arm64` | `darwin64-arm64` | macos-14, `-mmacos-version-min=10.15` |
 | `macos-x86_64` | `darwin64-x86_64` | macos-14, `-mmacos-version-min=10.15` |
 | `ios-arm64` | `ios64-xcrun` | macos-14, `-mios-version-min=12.0` |
-| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-14, `-mios-simulator-version-min=14.0` |
+| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
 | `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
 | `windows-x64` | `VC-WIN64A` | windows-2022, NASM x64 |
 | `windows-ia32` | `VC-WIN32` | windows-2022, NASM x86 |
 | `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (only image with the ARM64 toolset; this target needs no NASM) |
 
-Each Apple floor is the lowest that slice builds at, fixed in the workflow rather than derived
-from any consumer setting. `macos-arm64` and `ios-simulator-arm64` cannot go lower: clang
-raises anything beneath them to 11.0 and 14.0. Without the flag the archive would inherit the
-SDK default instead — the runner's own OS version — which older apps cannot link against.
+Both Apple platforms use one floor each: iOS 12.0, macOS 10.15. Two slices cannot be built at
+that floor — `macos-arm64` and `ios-simulator-arm64` are raised by clang to 11.0 and 14.0 — and
+their `LC_BUILD_VERSION` shows the raised value. Without the flags at all, every object would
+inherit the SDK default instead, i.e. the runner's own OS version.
 
 ## Build steps
 
