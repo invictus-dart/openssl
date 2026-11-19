@@ -1,4 +1,4 @@
-name: prebuilt
+name: release
 
 # Builds static OpenSSL bundles for a fixed set of target triples and publishes
 # them as release assets. Assets are named openssl-<version>-<suffix>.tar.gz and
@@ -16,8 +16,8 @@ on:
         required: true
         default: openssl-3.5.9
   push:
-    branches: [prebuilt]
-    paths: [scripts/**, .github/workflows/prebuilt.yml]
+    branches: [invictus-dart/release]
+    paths: [scripts/**, .github/workflows/release.yml]
 
 permissions:
   contents: write

@@ -63,7 +63,7 @@ in CI instead of at the consumer.
 
 ## Running it
 
-Dispatch **prebuilt** with `tag` (OpenSSL tag to build, e.g. `openssl-3.5.9`) and `release`
+Dispatch **release** with `tag` (OpenSSL tag to build, e.g. `openssl-3.5.9`) and `release`
 (the release to publish under). Re-running with the same release replaces the assets in place.
 A push to this branch that touches `scripts/` or the workflow file builds it too.
 
@@ -74,7 +74,7 @@ Repository settings that cannot be committed:
    single workflow, so pushing here schedules exactly one run.
 2. **Settings → Actions → General → Workflow permissions**: *Read and write*, so the release
    step can upload assets with `GITHUB_TOKEN`.
-3. **Default branch = `prebuilt`**, otherwise GitHub shows no *Run workflow* button
+3. **Default branch = `invictus-dart/release`**, otherwise GitHub shows no *Run workflow* button
    (`workflow_dispatch` is only listed for files on the default branch).
 
 ## Local build
@@ -82,7 +82,7 @@ Repository settings that cannot be committed:
 ```sh
 SRC_DIR=~/src/openssl OUT_DIR=$PWD/out ./scripts/build.sh 3.5.9 linux-x86_64 linux-x86_64
 SRC_DIR=~/src/openssl OUT_DIR=$PWD/out SMOKE_CMD="xcrun -sdk macosx cc" \
-  ./scripts/build.sh 3.5.9 darwin64-arm64 macos-arm64 -mmacos-version-min=11.0
+  ./scripts/build.sh 3.5.9 darwin64-arm64 macos-arm64 -mmacos-version-min=10.15
 ```
 
 ```powershell
