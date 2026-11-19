@@ -28,7 +28,7 @@ env:
 
 jobs:
   linux:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -53,7 +53,7 @@ jobs:
 
   # Cross-compiled on Linux: the NDK ships native linux-x86_64 host binaries.
   android:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       NDK: android-ndk-r28c
       API: "24"
@@ -85,7 +85,7 @@ jobs:
         with: { name: "${{ matrix.suffix }}", path: out/*.tar.gz, if-no-files-found: error }
 
   apple:
-    runs-on: macos-15
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
@@ -116,8 +116,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { suffix: windows-x64,   target: VC-WIN64A,    vc_arch: x64,   runner: windows-2022,  nasm: x64 }
-          - { suffix: windows-ia32,  target: VC-WIN32,     vc_arch: x86,   runner: windows-2022,  nasm: x86 }
+          - { suffix: windows-x64,   target: VC-WIN64A,    vc_arch: x64,   runner: windows-latest,  nasm: x64 }
+          - { suffix: windows-ia32,  target: VC-WIN32,     vc_arch: x86,   runner: windows-latest,  nasm: x86 }
           # windows-2022 carries no ARM64 MSVC toolset. VC-WIN64-ARM has no
           # asm_arch, so Configure disables asm and NASM is not needed.
           - { suffix: windows-arm64, target: VC-WIN64-ARM, vc_arch: arm64, runner: windows-11-arm }
@@ -159,7 +159,7 @@ jobs:
 
   publish:
     needs: [linux, android, apple, windows]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with: { path: ci }

@@ -25,21 +25,21 @@ one header that differs per triple, the rest are identical.
 
 | suffix | configure target | runner |
 | --- | --- | --- |
-| `linux-x86_64` | `linux-x86_64` | ubuntu-24.04 |
-| `linux-ia32` | `linux-x86` | ubuntu-24.04 (gcc-multilib) |
-| `linux-aarch64` | `linux-aarch64` | ubuntu-24.04 (cross) |
-| `linux-armv4` | `linux-armv4` | ubuntu-24.04 (cross) |
-| `android-arm64` | `android-arm64` | ubuntu-24.04 + NDK r28c, `-D__ANDROID_API__=24` |
+| `linux-x86_64` | `linux-x86_64` | ubuntu-latest |
+| `linux-ia32` | `linux-x86` | ubuntu-latest (gcc-multilib) |
+| `linux-aarch64` | `linux-aarch64` | ubuntu-latest (cross) |
+| `linux-armv4` | `linux-armv4` | ubuntu-latest (cross) |
+| `android-arm64` | `android-arm64` | ubuntu-latest + NDK r28c, `-D__ANDROID_API__=24` |
 | `android-arm` | `android-arm` | same |
 | `android-x86_64` | `android-x86_64` | same |
 | `android-x86` | `android-x86` | same |
-| `macos-arm64` | `darwin64-arm64` | macos-15, `-mmacos-version-min=10.15` |
-| `macos-x86_64` | `darwin64-x86_64` | macos-15, `-mmacos-version-min=10.15` |
-| `ios-arm64` | `ios64-xcrun` | macos-15, `-mios-version-min=12.0` |
-| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-15, `-mios-simulator-version-min=12.0` |
-| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-15, `-mios-simulator-version-min=12.0` |
-| `windows-x64` | `VC-WIN64A` | windows-2022, NASM x64 |
-| `windows-ia32` | `VC-WIN32` | windows-2022, NASM x86 |
+| `macos-arm64` | `darwin64-arm64` | macos-latest, `-mmacos-version-min=10.15` |
+| `macos-x86_64` | `darwin64-x86_64` | macos-latest, `-mmacos-version-min=10.15` |
+| `ios-arm64` | `ios64-xcrun` | macos-latest, `-mios-version-min=12.0` |
+| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-latest, `-mios-simulator-version-min=12.0` |
+| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-latest, `-mios-simulator-version-min=12.0` |
+| `windows-x64` | `VC-WIN64A` | windows-latest, NASM x64 |
+| `windows-ia32` | `VC-WIN32` | windows-latest, NASM x86 |
 | `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (only image with the ARM64 toolset; this target needs no NASM) |
 
 Both Apple platforms use one floor each: iOS 12.0, macOS 10.15. Two slices cannot be built at
@@ -89,4 +89,7 @@ SRC_DIR=~/src/openssl OUT_DIR=$PWD/out SMOKE_CMD="xcrun -sdk macosx cc" \
 .\scripts\build.ps1 -Version 3.5.9 -Target VC-WIN64A -Suffix windows-x64 -VcArch x64 -SrcDir .\src
 ```
 
-Requires `perl`, `make` (or `jom` + `cl` + NASM on Windows), and Xcode for Apple targets.
+Requires `perl` and `make` on unix. On Windows OpenSSL's `VC-*` targets invoke MSVC's
+`cl` directly, so `cl` plus its `INCLUDE`/`LIB` environment has to be present — running
+`vcvarsall.bat <arch>` from a Visual Studio installation provides both — together with `jom`
+and, for the x86/x64 targets only, NASM. Apple targets need Xcode.
