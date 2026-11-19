@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds one static OpenSSL bundle.
 #
-#   build.sh <tag> <target> <suffix> [extra configure args...]
+#   build.sh <tag> <target> [extra configure args...]
 #
 # SRC_DIR        openssl source tree (required)
 # OUT_DIR        output directory (default: ./out)
@@ -14,15 +14,14 @@ set -euo pipefail
 
 tag=${1:?tag}
 target=${2:?target}
-suffix=${3:?suffix}
-shift 3
+shift 2
 
 # 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<suffix>.
 version=${tag#openssl-}
 
 src=${SRC_DIR:?SRC_DIR must point at an openssl source tree}
 out=${OUT_DIR:-$PWD/out}
-asset="openssl-${version}-${suffix}"
+asset="openssl-${version}-${target}"
 stage="${out}/${asset}"
 
 jobs=$(nproc 2>/dev/null || sysctl -n hw.ncpu)

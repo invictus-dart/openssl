@@ -26,23 +26,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suffix: linux-x86_64
-            target: linux-x86_64
+          - target: linux-x86_64
             smoke: cc
 
-          - suffix: linux-ia32
-            target: linux-x86
+          - target: linux-x86
             smoke: gcc -m32
             apt: gcc-multilib
 
-          - suffix: linux-aarch64
-            target: linux-aarch64
+          - target: linux-aarch64
             smoke: aarch64-linux-gnu-gcc
             apt: gcc-aarch64-linux-gnu
             extra: --cross-compile-prefix=aarch64-linux-gnu-
 
-          - suffix: linux-armv4
-            target: linux-armv4
+          - target: linux-armv4
             smoke: arm-linux-gnueabihf-gcc
             apt: gcc-arm-linux-gnueabihf
             extra: --cross-compile-prefix=arm-linux-gnueabihf-
@@ -62,11 +58,11 @@ jobs:
       - run: |
           chmod +x ci/scripts/build.sh
           SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_CMD="${{ matrix.smoke }}" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.suffix }}" ${{ matrix.extra }}
+            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" ${{ matrix.extra }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.suffix }}
+          name: ${{ matrix.target }}
           path: out/*.tar.gz
           if-no-files-found: error
 
@@ -80,20 +76,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suffix: android-arm64
-            target: android-arm64
+          - target: android-arm64
             abi: aarch64-linux-android
 
-          - suffix: android-arm
-            target: android-arm
+          - target: android-arm
             abi: armv7a-linux-androideabi
 
-          - suffix: android-x86_64
-            target: android-x86_64
+          - target: android-x86_64
             abi: x86_64-linux-android
 
-          - suffix: android-x86
-            target: android-x86
+          - target: android-x86
             abi: i686-linux-android
     steps:
       - uses: actions/checkout@v4
@@ -116,12 +108,11 @@ jobs:
           chmod +x ci/scripts/build.sh
           SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_LDFLAGS="-ldl" \
           SMOKE_CMD="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.abi }}${API}-clang" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.suffix }}" \
-              -D__ANDROID_API__=${API}
+            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" -D__ANDROID_API__=${API}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.suffix }}
+          name: ${{ matrix.target }}
           path: out/*.tar.gz
           if-no-files-found: error
 
@@ -134,28 +125,23 @@ jobs:
           # One floor per platform, set here rather than taken from a consumer:
           # iOS 12.0, macOS 10.15. The two arm64 slices cannot be built that low,
           # so clang raises them (11.0 and 14.0) and LC_BUILD_VERSION shows that.
-          - suffix: macos-arm64
-            target: darwin64-arm64
+          - target: darwin64-arm64
             smoke: xcrun -sdk macosx cc
             min: -mmacos-version-min=10.15
 
-          - suffix: macos-x86_64
-            target: darwin64-x86_64
+          - target: darwin64-x86_64
             smoke: xcrun -sdk macosx cc -arch x86_64
             min: -mmacos-version-min=10.15
 
-          - suffix: ios-arm64
-            target: ios64-xcrun
+          - target: ios64-xcrun
             smoke: xcrun -sdk iphoneos cc -arch arm64
             min: -mios-version-min=12.0
 
-          - suffix: ios-simulator-arm64
-            target: iossimulator-arm64-xcrun
+          - target: iossimulator-arm64-xcrun
             smoke: xcrun -sdk iphonesimulator cc -arch arm64
             min: -mios-simulator-version-min=12.0
 
-          - suffix: ios-simulator-x86_64
-            target: iossimulator-x86_64-xcrun
+          - target: iossimulator-x86_64-xcrun
             smoke: xcrun -sdk iphonesimulator cc -arch x86_64
             min: -mios-simulator-version-min=12.0
     steps:
@@ -171,11 +157,11 @@ jobs:
       - run: |
           chmod +x ci/scripts/build.sh
           SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_CMD="${{ matrix.smoke }}" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.suffix }}" "${{ matrix.min }}"
+            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.min }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.suffix }}
+          name: ${{ matrix.target }}
           path: out/*.tar.gz
           if-no-files-found: error
 
@@ -185,23 +171,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suffix: windows-x64
-            target: VC-WIN64A
-            vc_arch: x64
+          - target: VC-WIN64A
             runner: windows-latest
             nasm: x64
 
-          - suffix: windows-ia32
-            target: VC-WIN32
-            vc_arch: x86
+          - target: VC-WIN32
             runner: windows-latest
             nasm: x86
 
           # windows-2022 carries no ARM64 MSVC toolset. VC-WIN64-ARM has no
           # asm_arch, so Configure disables asm and NASM is not needed here.
-          - suffix: windows-arm64
-            target: VC-WIN64-ARM
-            vc_arch: arm64
+          - target: VC-WIN64-ARM
             runner: windows-11-arm
     steps:
       - uses: actions/checkout@v4
@@ -244,12 +224,11 @@ jobs:
         shell: pwsh
         run: |
           .\ci\scripts\build.ps1 -Tag $env:TAG -Target '${{ matrix.target }}' `
-            -Suffix '${{ matrix.suffix }}' -VcArch '${{ matrix.vc_arch }}' `
             -SrcDir "$PWD\src" -OutDir "$PWD\out"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.suffix }}
+          name: ${{ matrix.target }}
           path: out/*.tar.gz
           if-no-files-found: error
 

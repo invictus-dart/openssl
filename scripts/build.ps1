@@ -1,17 +1,23 @@
 param(
   [Parameter(Mandatory = $true)][string]$Tag,
   [Parameter(Mandatory = $true)][string]$Target,
-  [Parameter(Mandatory = $true)][string]$Suffix,
-  [Parameter(Mandatory = $true)][string]$VcArch,
   [string]$SrcDir = $env:SRC_DIR,
   [string]$OutDir = "./out"
 )
 
 $ErrorActionPreference = 'Stop'
 
-# 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<suffix>.
+# 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<target>.
 $Version = $Tag -replace '^openssl-', ''
-$asset = "openssl-$Version-$Suffix"
+$asset = "openssl-$Version-$Target"
+
+# The target decides the MSVC environment; there is no separate arch parameter.
+$VcArch = switch ($Target) {
+  "VC-WIN32"     { "x86" }
+  "VC-WIN64A"    { "x64" }
+  "VC-WIN64-ARM" { "arm64" }
+  default        { throw "unsupported target $Target" }
+}
 $stage = Join-Path $OutDir $asset
 
 if (-not $SrcDir) { throw "SRC_DIR must point at an openssl source tree" }

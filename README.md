@@ -9,7 +9,7 @@ artifacts are unpatched upstream builds.
 | item | value |
 | --- | --- |
 | release | tag `openssl-3.5.9` becomes release tag `v3.5.9`, titled `OpenSSL v3.5.9` |
-| asset | `openssl-<version>-<suffix>.tar.gz`, unpacking into a directory of that name |
+| asset | `openssl-<version>-<target>.tar.gz`, unpacking into a directory of that name |
 | contents | the complete `make install` tree, nothing pruned: `include/`, `lib/` (libraries with pkgconfig and cmake metadata), `ssl/`, plus `build-info.json` and `LICENSE.txt` |
 | checksums | `SHA256SUMS` next to the assets |
 
@@ -20,34 +20,34 @@ The archive root matches the file name, so consumers unpack with `tar -xzf` and 
 
 ## Targets
 
-| suffix | configure target | name on the platform | build notes |
-| --- | --- | --- | --- |
-| `linux-x86_64` | `linux-x86_64` | `x86_64` (Rust `x86_64-unknown-linux-gnu`) | ubuntu-latest |
-| `linux-ia32` | `linux-x86` | `i686` (`i686-unknown-linux-gnu`) | ubuntu-latest, gcc-multilib |
-| `linux-aarch64` | `linux-aarch64` | `aarch64` (`aarch64-unknown-linux-gnu`) | ubuntu-latest, cross |
-| `linux-armv4` | `linux-armv4` | `armv7l` (`armv7-unknown-linux-gnueabihf`), built at the ARMv4 baseline | ubuntu-latest, cross |
-| `android-arm64` | `android-arm64` | `arm64-v8a` (clang `aarch64-linux-android24`) | ubuntu-latest + NDK r28c |
-| `android-arm` | `android-arm` | `armeabi-v7a` (`armv7a-linux-androideabi24`) | same |
-| `android-x86_64` | `android-x86_64` | `x86_64` | same |
-| `android-x86` | `android-x86` | `x86` | same |
-| `macos-arm64` | `darwin64-arm64` | `arm64` | macos-latest, `-mmacos-version-min=10.15` |
-| `macos-x86_64` | `darwin64-x86_64` | `x86_64` | macos-latest, same floor |
-| `ios-arm64` | `ios64-xcrun` | `arm64`, device | macos-latest, `-mios-version-min=12.0` |
-| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | `arm64`, simulator | macos-latest, `-mios-simulator-version-min=12.0` |
-| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | `x86_64`, simulator | macos-latest, same floor |
-| `windows-x64` | `VC-WIN64A` | `x64` | windows-latest, NASM x64 |
-| `windows-ia32` | `VC-WIN32` | `x86` / `Win32` | windows-latest, NASM x86 |
-| `windows-arm64` | `VC-WIN64-ARM` | `arm64` | windows-11-arm, no NASM |
+| asset suffix = configure target | name on the platform | build notes |
+| --- | --- | --- |
+| `linux-x86_64` | `x86_64` (Rust `x86_64-unknown-linux-gnu`) | ubuntu-latest |
+| `linux-x86` | `i686` (`i686-unknown-linux-gnu`) | ubuntu-latest, gcc-multilib |
+| `linux-aarch64` | `aarch64` (`aarch64-unknown-linux-gnu`) | ubuntu-latest, cross |
+| `linux-armv4` | `armv7l` (`armv7-unknown-linux-gnueabihf`), built at the ARMv4 baseline | ubuntu-latest, cross |
+| `android-arm64` | `arm64-v8a` (clang `aarch64-linux-android24`) | ubuntu-latest + NDK r28c |
+| `android-arm` | `armeabi-v7a` (`armv7a-linux-androideabi24`) | same |
+| `android-x86_64` | `x86_64` | same |
+| `android-x86` | `x86` | same |
+| `darwin64-arm64` | `arm64`, macOS | macos-latest, `-mmacos-version-min=10.15` |
+| `darwin64-x86_64` | `x86_64`, macOS | macos-latest, same floor |
+| `ios64-xcrun` | `arm64`, device | macos-latest, `-mios-version-min=12.0` |
+| `iossimulator-arm64-xcrun` | `arm64`, simulator | macos-latest, `-mios-simulator-version-min=12.0` |
+| `iossimulator-x86_64-xcrun` | `x86_64`, simulator | macos-latest, same floor |
+| `VC-WIN64A` | `x64` | windows-latest, NASM x64 |
+| `VC-WIN32` | `x86` / `Win32` | windows-latest, NASM x86 |
+| `VC-WIN64-ARM` | `arm64` | windows-11-arm, no NASM |
 
-Three naming layers meet here. The *configure target* is OpenSSL's own vocabulary and cannot be
-changed. The *suffix* is this repository's, and its arch token copies the platform's own name —
-`x86_64` on Linux, `arm64-v8a` on Android, `arm64` on Apple, `x64` on Windows — so it reads the
-way a consumer on that platform names things. The *name on the platform* column is what a
-toolchain will ask for when linking. Libraries are `libcrypto.a` and `libssl.a` everywhere
+The suffix is the Configure target verbatim, so Apple and Windows assets carry OpenSSL's own
+vocabulary (`darwin64-arm64`, `ios64-xcrun`, `VC-WIN64A`) rather than a separate naming scheme.
+The *name on the platform* column is what that platform's toolchain asks for, which is the
+mapping a consumer needs: `linux-x86_64` is `x86_64`, `linux-x86` is `i686`, `android-arm` is
+`armeabi-v7a`, `VC-WIN64A` is `x64`. Libraries are `libcrypto.a` and `libssl.a` everywhere
 except Windows, where they are `libcrypto.lib` and `libssl.lib`.
 
-Each Apple platform gets one floor: iOS 12.0, macOS 10.15. `macos-arm64` and
-`ios-simulator-arm64` cannot be built that low, so clang raises them to 11.0 and 14.0 and
+Each Apple platform gets one floor: iOS 12.0, macOS 10.15. `darwin64-arm64` and
+`iossimulator-arm64-xcrun` cannot be built that low, so clang raises them to 11.0 and 14.0 and
 `LC_BUILD_VERSION` records the raised value. Without the flags every object would inherit the
 SDK default, i.e. the runner's own OS version.
 
@@ -97,13 +97,13 @@ Repository settings that cannot be committed:
 ## Local build
 
 ```sh
-SRC_DIR=~/src/openssl OUT_DIR=$PWD/out ./scripts/build.sh 3.5.9 linux-x86_64 linux-x86_64
+SRC_DIR=~/src/openssl OUT_DIR=$PWD/out ./scripts/build.sh openssl-3.5.9 linux-x86_64
 SRC_DIR=~/src/openssl OUT_DIR=$PWD/out SMOKE_CMD="xcrun -sdk macosx cc" \
-  ./scripts/build.sh openssl-3.5.9 darwin64-arm64 macos-arm64 -mmacos-version-min=10.15
+  ./scripts/build.sh openssl-3.5.9 darwin64-arm64 -mmacos-version-min=10.15
 ```
 
 ```powershell
-.\scripts\build.ps1 -Tag openssl-3.5.9 -Target VC-WIN64A -Suffix windows-x64 -VcArch x64 -SrcDir .\src
+.\scripts\build.ps1 -Tag openssl-3.5.9 -Target VC-WIN64A -SrcDir .\src
 ```
 
 Unix needs `perl` and `make`. On Windows OpenSSL's `VC-*` targets invoke MSVC's `cl` directly,
