@@ -1,26 +1,28 @@
 param(
   [Parameter(Mandatory = $true)][string]$Tag,
   [Parameter(Mandatory = $true)][string]$Target,
-  [string]$SrcDir = $env:SRC_DIR,
-  [string]$OutDir = "./out"
+  [Parameter(Mandatory = $true)][string]$SrcDir,
+  [Parameter(Mandatory = $true)][string]$OutDir
 )
+
+# Builds one static OpenSSL bundle for Windows.
+#   build-windows.ps1 -Tag <tag> -Target <target> -SrcDir <src> -OutDir <out>
+# The asset is openssl-<version>-<target>.tar.gz. The target also selects the
+# MSVC architecture, so no separate arch parameter exists.
 
 $ErrorActionPreference = 'Stop'
 
-# 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<target>.
 $Version = $Tag -replace '^openssl-', ''
 $asset = "openssl-$Version-$Target"
 
-# The target decides the MSVC environment; there is no separate arch parameter.
 $VcArch = switch ($Target) {
   "VC-WIN32"     { "x86" }
   "VC-WIN64A"    { "x64" }
   "VC-WIN64-ARM" { "arm64" }
   default        { throw "unsupported target $Target" }
 }
-$stage = Join-Path $OutDir $asset
 
-if (-not $SrcDir) { throw "SRC_DIR must point at an openssl source tree" }
+$stage = Join-Path $OutDir $asset
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null

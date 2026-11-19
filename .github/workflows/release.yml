@@ -35,8 +35,6 @@ jobs:
             apt: gcc-arm-linux-gnueabihf
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ci
 
       - uses: actions/checkout@v4
         with:
@@ -46,10 +44,10 @@ jobs:
       - if: matrix.apt
         run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
 
-      - run: |
-          chmod +x ci/scripts/build.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}"
+      - name: Build bundle
+        run: |
+          chmod +x scripts/build-linux.sh
+          scripts/build-linux.sh "${TAG}" "${{ matrix.target }}" "$PWD/src" "$PWD/out"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -62,14 +60,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NDK: android-ndk-r28c
+      API: "24"
     strategy:
       fail-fast: false
       matrix:
         target: [android-arm64, android-arm, android-x86_64, android-x86]
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ci
 
       - uses: actions/checkout@v4
         with:
@@ -82,10 +79,10 @@ jobs:
           unzip -q ndk.zip
           echo "$PWD/${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
 
-      - run: |
-          chmod +x ci/scripts/build.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}"
+      - name: Build bundle
+        run: |
+          chmod +x scripts/build-android.sh
+          scripts/build-android.sh "${TAG}" "${{ matrix.target }}" "${API}" "$PWD/src" "$PWD/out"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -114,18 +111,16 @@ jobs:
             min: -mios-simulator-version-min=12.0
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ci
 
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TAG }}
           path: src
 
-      - run: |
-          chmod +x ci/scripts/build.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.min }}"
+      - name: Build bundle
+        run: |
+          chmod +x scripts/build-apple.sh
+          scripts/build-apple.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.min }}" "$PWD/src" "$PWD/out"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -152,8 +147,6 @@ jobs:
             runner: windows-11-arm
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: ci
 
       - uses: actions/checkout@v4
         with:
@@ -190,7 +183,7 @@ jobs:
       - name: Build bundle
         shell: pwsh
         run: |
-          .\ci\scripts\build.ps1 -Tag $env:TAG -Target '${{ matrix.target }}' `
+          .\scripts\build-windows.ps1 -Tag $env:TAG -Target '${{ matrix.target }}' `
             -SrcDir "$PWD\src" -OutDir "$PWD\out"
 
       - uses: actions/upload-artifact@v4

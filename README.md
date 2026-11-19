@@ -62,20 +62,20 @@ Every bundle comes from the same three steps:
 3. `install` (`jom install /J 1` on Windows, because the install rules rewrite `makefile` and
    cannot run concurrently). That install tree is archived unmodified.
 
-Nothing is compiled twice and nothing is pruned: the scripts run `Configure`, `build_libs` and
-`install`, then pack the install tree.
+Nothing is compiled twice and nothing is pruned: a script configures, builds the libraries,
+installs, then packs the install tree. One script per platform, every input on the command line:
 
-`scripts/build.sh <tag> <target> [apple-min-version]` needs nothing else. Everything
-`Configure` requires beyond the tag and the target is derived from the target:
-
-| target | derived |
+| script | arguments |
 | --- | --- |
-| `android-*` | `-D__ANDROID_API__=24` (`ANDROID_API` overrides it), compilers from the NDK `bin` on `PATH` |
-| `linux-aarch64` | `--cross-compile-prefix=aarch64-linux-gnu-` |
-| `linux-armv4` | `--cross-compile-prefix=arm-linux-gnueabihf-` |
-| `linux-x86` | nothing; the host `gcc -m32` needs `gcc-multilib` installed |
-| `darwin64-*`, `ios*`, `iossimulator-*` | the version floor, which is the third argument |
-| `VC-*` | `build.ps1` picks the MSVC architecture: `VC-WIN32` → `x86`, `VC-WIN64A` → `x64`, `VC-WIN64-ARM` → `arm64` |
+| `scripts/build-linux.sh` | `<tag> <target> <src-dir> <out-dir>` |
+| `scripts/build-android.sh` | `<tag> <target> <api> <src-dir> <out-dir>` |
+| `scripts/build-apple.sh` | `<tag> <target> <min-version> <src-dir> <out-dir>` |
+| `scripts/build-windows.ps1` | `-Tag -Target -SrcDir -OutDir` |
+
+What each script adds beyond the two inputs follows from its platform: Linux cross targets pass
+their `--cross-compile-prefix`, Android passes the API level it was given, Apple passes the
+version floor it was given, and Windows picks the MSVC architecture from the target
+(`VC-WIN32` → `x86`, `VC-WIN64A` → `x64`, `VC-WIN64-ARM` → `arm64`).
 
 The version in the asset name is the tag without its `openssl-` prefix.
 
@@ -110,13 +110,14 @@ Repository settings that cannot be committed:
 ## Local build
 
 ```sh
-SRC_DIR=~/src/openssl OUT_DIR=$PWD/out ./scripts/build.sh openssl-3.5.9 linux-x86_64
-SRC_DIR=~/src/openssl OUT_DIR=$PWD/out \
-  ./scripts/build.sh openssl-3.5.9 darwin64-arm64 -mmacos-version-min=10.15
+./scripts/build-linux.sh openssl-3.5.9 linux-x86_64 ~/src/openssl ./out
+./scripts/build-android.sh openssl-3.5.9 android-arm64 24 ~/src/openssl ./out
+./scripts/build-apple.sh openssl-3.5.9 darwin64-arm64 -mmacos-version-min=10.15 \
+  ~/src/openssl ./out
 ```
 
 ```powershell
-.\scripts\build.ps1 -Tag openssl-3.5.9 -Target VC-WIN64A -SrcDir .\src
+.\scripts\build-windows.ps1 -Tag openssl-3.5.9 -Target VC-WIN64A -SrcDir .\src -OutDir .\out
 ```
 
 The runner image ships only a native `gcc`, so the three cross-compiled Linux targets install
