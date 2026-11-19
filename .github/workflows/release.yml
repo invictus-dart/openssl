@@ -120,7 +120,7 @@ jobs:
           - { suffix: windows-ia32,  target: VC-WIN32,     vc_arch: x86,   runner: windows-latest,  nasm: x86 }
           # windows-2022 carries no ARM64 MSVC toolset. VC-WIN64-ARM has no
           # asm_arch, so Configure disables asm and NASM is not needed.
-          - { suffix: windows-arm64, target: VC-WIN64-ARM, vc_arch: arm64, runner: windows-11-vs2026-arm }
+          - { suffix: windows-arm64, target: VC-WIN64-ARM, vc_arch: arm64, runner: windows-11-arm }
     steps:
       - uses: actions/checkout@v4
         with: { path: ci }
