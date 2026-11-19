@@ -10,12 +10,13 @@ artifacts are unpatched upstream builds.
 | --- | --- |
 | release | tag `openssl-3.5.9` becomes release tag `v3.5.9`, titled `OpenSSL v3.5.9` |
 | asset | `openssl-<version>-<suffix>.tar.gz`, unpacking into a directory of that name |
-| contents | the complete `make install` tree — `include/`, `lib/`, `bin/`, `ssl/`, engines, modules, cmake/pkgconfig — plus `build-info.json` and `LICENSE.txt` |
+| contents | the complete `make install` tree, nothing pruned: `include/`, `lib/` (libraries with pkgconfig and cmake metadata), `ssl/`, plus `build-info.json` and `LICENSE.txt` |
 | checksums | `SHA256SUMS` next to the assets |
 
 The archive root matches the file name, so consumers unpack with `tar -xzf` and link against
 `<root>/lib` with headers from `<root>/include`. Headers ship inside every bundle because
-`Configure` generates them; only `configuration.h` differs per target.
+`Configure` generates them; only `configuration.h` differs per target. A bundle holds no
+`openssl` CLI: `no-apps` is passed to `Configure`, so there is nothing for `bin/` to carry.
 
 ## Targets
 
