@@ -33,20 +33,19 @@ one header that differs per triple, the rest are identical.
 | `android-arm` | `android-arm` | same |
 | `android-x86_64` | `android-x86_64` | same |
 | `android-x86` | `android-x86` | same |
-| `macos-arm64` | `darwin64-arm64` | macos-14, `-mmacos-version-min=10.15`, floor 11.0 |
-| `macos-x86_64` | `darwin64-x86_64` | macos-14, `-mmacos-version-min=10.15`, floor 10.15 |
-| `ios-arm64` | `ios64-xcrun` | macos-14, `-mios-version-min=12.0`, floor 12.0 |
-| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-14, `-mios-simulator-version-min=12.0`, floor 14.0 |
-| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-14, `-mios-simulator-version-min=12.0`, floor 12.0 |
+| `macos-arm64` | `darwin64-arm64` | macos-14, `-mmacos-version-min=10.15` |
+| `macos-x86_64` | `darwin64-x86_64` | macos-14, `-mmacos-version-min=10.15` |
+| `ios-arm64` | `ios64-xcrun` | macos-14, `-mios-version-min=12.0` |
+| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
+| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
 | `windows-x64` | `VC-WIN64A` | windows-2022, NASM x64 |
 | `windows-ia32` | `VC-WIN32` | windows-2022, NASM x86 |
 | `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (only image with the ARM64 toolset; this target needs no NASM) |
 
-Both platforms get one flag each: iOS 12.0, macOS 10.15. The `floor` column is the minimum
-recorded in `LC_BUILD_VERSION`, which is what a linker compares against, so it — not the flag —
-decides the oldest OS an app may target. `macos-arm64` and `ios-simulator-arm64` cannot be built
-at 10.15 / 12.0 and clang raises them to 11.0 / 14.0. Omitting the flags would leave every object
-at the SDK default, i.e. the runner's own OS version.
+Both Apple platforms use one floor each: iOS 12.0, macOS 10.15. Two slices cannot be built at
+that floor — `macos-arm64` and `ios-simulator-arm64` are raised by clang to 11.0 and 14.0 — and
+their `LC_BUILD_VERSION` shows the raised value. Without the flags at all, every object would
+inherit the SDK default instead, i.e. the runner's own OS version.
 
 ## Build steps
 
