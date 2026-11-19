@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Builds one static OpenSSL bundle for macOS or iOS with Xcode.
+# Builds one static OpenSSL bundle for macOS with Xcode.
 #
-#   build-apple.sh <tag> <target> <min-version> <src-dir> <out-dir>
+#   build-macos.sh <tag> <target> <version> <src-dir> <out-dir>
 #
-# The asset is openssl-<version>-<target>.tar.gz. <min-version> is one of
-# -mmacos-version-min=, -mios-version-min= or -mios-simulator-version-min= and
-# is required: without it every object inherits the SDK default.
+# The asset is openssl-<version>-<target>.tar.gz. <version> is the deployment
+# floor, e.g. 10.15. Without it every object would inherit the SDK default.
 set -euo pipefail
 
 tag=${1:?tag}
 target=${2:?target}
-minver=${3:?min-version}
+floor=${3:?version}
 src=${4:?src-dir}
 out=${5:?out-dir}
 
@@ -26,7 +25,7 @@ mkdir -p "${stage}"
 cd "${src}"
 perl Configure "${target}" \
   no-shared no-pinshared no-apps no-tests no-docs \
-  --prefix="${stage}" --libdir=lib "${minver}"
+  --prefix="${stage}" --libdir=lib "-mmacos-version-min=${floor}"
 make -j"${jobs}" build_libs
 make install
 
@@ -37,7 +36,7 @@ for lib in libcrypto.a libssl.a; do
 done
 
 cat >"${stage}/build-info.json" <<JSON
-{"version":"${version}","target":"${target}","min":"${minver}","asset":"${asset}","host":"$(uname -srm)","built":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+{"version":"${version}","target":"${target}","min-os":"${floor}","asset":"${asset}","host":"$(uname -srm)","built":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 JSON
 
 cp "${src}/LICENSE.txt" "${stage}/LICENSE.txt"

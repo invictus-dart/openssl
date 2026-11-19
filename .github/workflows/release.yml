@@ -90,25 +90,16 @@ jobs:
           path: out/*.tar.gz
           if-no-files-found: error
 
-  apple:
+  macos:
     runs-on: macos-latest
+    env:
+      # Deployment floor. darwin64-arm64 cannot be built that low, so clang
+      # raises it to 11.0 and LC_BUILD_VERSION records the raised value.
+      TARGET_VERSION: "10.15"
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # One floor per platform, set here rather than taken from a consumer:
-          # iOS 12.0, macOS 10.15. The two arm64 slices cannot be built that low,
-          # so clang raises them (11.0 and 14.0) and LC_BUILD_VERSION shows that.
-          - target: darwin64-arm64
-            min: -mmacos-version-min=10.15
-          - target: darwin64-x86_64
-            min: -mmacos-version-min=10.15
-          - target: ios64-xcrun
-            min: -mios-version-min=12.0
-          - target: iossimulator-arm64-xcrun
-            min: -mios-simulator-version-min=12.0
-          - target: iossimulator-x86_64-xcrun
-            min: -mios-simulator-version-min=12.0
+        target: [darwin64-arm64, darwin64-x86_64]
     steps:
       - uses: actions/checkout@v4
 
@@ -119,8 +110,36 @@ jobs:
 
       - name: Build bundle
         run: |
-          chmod +x scripts/build-apple.sh
-          scripts/build-apple.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.min }}" "$PWD/src" "$PWD/out"
+          chmod +x scripts/build-macos.sh
+          scripts/build-macos.sh "${TAG}" "${{ matrix.target }}" "${TARGET_VERSION}" "$PWD/src" "$PWD/out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: out/*.tar.gz
+          if-no-files-found: error
+
+  ios:
+    runs-on: macos-latest
+    env:
+      # Deployment floor, applied to the device and simulator builds alike.
+      TARGET_VERSION: "12.0"
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ios64-xcrun, iossimulator-arm64-xcrun, iossimulator-x86_64-xcrun]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          path: src
+
+      - name: Build bundle
+        run: |
+          chmod +x scripts/build-ios.sh
+          scripts/build-ios.sh "${TAG}" "${{ matrix.target }}" "${TARGET_VERSION}" "$PWD/src" "$PWD/out"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -193,7 +212,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [linux, android, apple, windows]
+    needs: [linux, android, macos, ios, windows]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

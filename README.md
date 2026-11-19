@@ -69,13 +69,16 @@ installs, then packs the install tree. One script per platform, every input on t
 | --- | --- |
 | `scripts/build-linux.sh` | `<tag> <target> <src-dir> <out-dir>` |
 | `scripts/build-android.sh` | `<tag> <target> <api> <src-dir> <out-dir>` |
-| `scripts/build-apple.sh` | `<tag> <target> <min-version> <src-dir> <out-dir>` |
+| `scripts/build-macos.sh` | `<tag> <target> <version> <src-dir> <out-dir>` |
+| `scripts/build-ios.sh` | `<tag> <target> <version> <src-dir> <out-dir>` |
 | `scripts/build-windows.ps1` | `-Tag -Target -SrcDir -OutDir` |
 
 What each script adds beyond the two inputs follows from its platform: Linux cross targets pass
-their `--cross-compile-prefix`, Android passes the API level it was given, Apple passes the
-version floor it was given, and Windows picks the MSVC architecture from the target
-(`VC-WIN32` → `x86`, `VC-WIN64A` → `x64`, `VC-WIN64-ARM` → `arm64`).
+their `--cross-compile-prefix`, Android passes the API level it was given, macOS passes
+`-mmacos-version-min=`, iOS passes `-mios-version-min=` or `-mios-simulator-version-min=` by
+looking at the target, and Windows picks the MSVC architecture from the target
+(`VC-WIN32` → `x86`, `VC-WIN64A` → `x64`, `VC-WIN64-ARM` → `arm64`). In the workflow the
+Android API level and the two Apple floors live in each job's `env` (`API`, `TARGET_VERSION`).
 
 The version in the asset name is the tag without its `openssl-` prefix.
 
@@ -112,8 +115,8 @@ Repository settings that cannot be committed:
 ```sh
 ./scripts/build-linux.sh openssl-3.5.9 linux-x86_64 ~/src/openssl ./out
 ./scripts/build-android.sh openssl-3.5.9 android-arm64 24 ~/src/openssl ./out
-./scripts/build-apple.sh openssl-3.5.9 darwin64-arm64 -mmacos-version-min=10.15 \
-  ~/src/openssl ./out
+./scripts/build-macos.sh openssl-3.5.9 darwin64-arm64 10.15 ~/src/openssl ./out
+./scripts/build-ios.sh openssl-3.5.9 iossimulator-arm64-xcrun 12.0 ~/src/openssl ./out
 ```
 
 ```powershell
