@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory = $true)][string]$Version,
+  [Parameter(Mandatory = $true)][string]$Tag,
   [Parameter(Mandatory = $true)][string]$Target,
   [Parameter(Mandatory = $true)][string]$Suffix,
   [Parameter(Mandatory = $true)][string]$VcArch,
@@ -8,6 +8,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<suffix>.
+$Version = $Tag -replace '^openssl-', ''
 $asset = "openssl-$Version-$Suffix"
 $stage = Join-Path $OutDir $asset
 

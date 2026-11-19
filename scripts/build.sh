@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 # Builds one static OpenSSL bundle.
 #
-#   build.sh <version> <target> <suffix> [extra configure args...]
+#   build.sh <tag> <target> <suffix> [extra configure args...]
 #
-# SRC_DIR  openssl source tree (required)
-# OUT_DIR  output directory (default: ./out)
+# SRC_DIR        openssl source tree (required)
+# OUT_DIR        output directory (default: ./out)
 # SMOKE_CMD      command that compiles the link check, e.g.
 #                "xcrun -sdk iphoneos cc -arch arm64" (default: CC or cc)
 # SMOKE_LDFLAGS  extra flags for the link check
+#
+# <tag> may carry the openssl- prefix or omit it.
 set -euo pipefail
 
-version=${1:?version}
+tag=${1:?tag}
 target=${2:?target}
 suffix=${3:?suffix}
 shift 3
+
+# 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<suffix>.
+version=${tag#openssl-}
 
 src=${SRC_DIR:?SRC_DIR must point at an openssl source tree}
 out=${OUT_DIR:-$PWD/out}

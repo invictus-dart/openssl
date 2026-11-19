@@ -1,25 +1,21 @@
 # Prebuilt static OpenSSL
 
 This branch builds and publishes **static** OpenSSL libraries (`libcrypto`, `libssl`) for a
-fixed set of target triples. Sources always come from the OpenSSL release tag being built, so
-the artifacts are unpatched upstream builds.
+fixed set of targets. Sources always come from the OpenSSL release tag being built, so the
+artifacts are unpatched upstream builds.
 
 ## Assets
 
 | item | value |
 | --- | --- |
-| name | `openssl-<version>-<suffix>.tar.gz` |
-| root directory | the file name without `.tar.gz` |
-| contents | the complete `make install` tree: `include/`, `lib/`, `bin/`, `ssl/`, plus `build-info.json` and `LICENSE.txt` |
-| not pruned | engines, modules, cmake/pkgconfig and `applink.c` ship as install produces them |
+| release | tag `openssl-3.5.9` becomes release tag `v3.5.9`, titled `OpenSSL v3.5.9` |
+| asset | `openssl-<version>-<suffix>.tar.gz`, unpacking into a directory of that name |
+| contents | the complete `make install` tree — `include/`, `lib/`, `bin/`, `ssl/`, engines, modules, cmake/pkgconfig — plus `build-info.json` and `LICENSE.txt` |
+| checksums | `SHA256SUMS` next to the assets |
 
-The root directory has to match the file name: consumers extract with a plain `tar -xzf` and
-link against `<root>/lib`, with headers from `<root>/include`.
-
-Headers ship inside each bundle because `Configure` generates them; `configuration.h` is the
-one header that differs per triple, the rest are identical.
-
-`SHA256SUMS` is published next to the assets.
+The archive root matches the file name, so consumers unpack with `tar -xzf` and link against
+`<root>/lib` with headers from `<root>/include`. Headers ship inside every bundle because
+`Configure` generates them; only `configuration.h` differs per target.
 
 ## Targets
 
@@ -40,44 +36,54 @@ one header that differs per triple, the rest are identical.
 | `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-latest, `-mios-simulator-version-min=12.0` |
 | `windows-x64` | `VC-WIN64A` | windows-latest, NASM x64 |
 | `windows-ia32` | `VC-WIN32` | windows-latest, NASM x86 |
-| `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (the only ARM64 image; this target needs no NASM) |
+| `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (no ARM64 MSVC toolset elsewhere; this target needs no NASM) |
 
-Both Apple platforms use one floor each: iOS 12.0, macOS 10.15. Two slices cannot be built at
-that floor — `macos-arm64` and `ios-simulator-arm64` are raised by clang to 11.0 and 14.0 — and
-their `LC_BUILD_VERSION` shows the raised value. Without the flags at all, every object would
-inherit the SDK default instead, i.e. the runner's own OS version.
+Each Apple platform gets one floor: iOS 12.0, macOS 10.15. `macos-arm64` and
+`ios-simulator-arm64` cannot be built that low, so clang raises them to 11.0 and 14.0 and
+`LC_BUILD_VERSION` records the raised value. Without the flags every object would inherit the
+SDK default, i.e. the runner's own OS version.
 
 ## Build steps
 
-Every bundle is produced by the same three steps:
+Every bundle comes from the same three steps:
 
 1. `perl Configure <target> no-shared no-pinshared no-apps no-tests no-docs --prefix=<stage> --libdir=lib`
    plus the platform flags from the table above.
 2. `build_libs` in parallel — `make -j<n>`, or `jom /J <n>` with `CL=... /FS` on Windows so
    parallel `cl` calls do not collide on `ossl_static.pdb`.
 3. `install` (`jom install /J 1` on Windows, because the install rules rewrite `makefile` and
-   cannot run concurrently). That install tree is what gets archived, unmodified.
+   cannot run concurrently). That install tree is archived unmodified.
 
 A one-line program is linked against `libcrypto` before packaging, so an unusable archive fails
-in CI instead of at the consumer.
+in CI instead of at the consumer. The version in the asset name is the tag without its
+`openssl-` prefix.
 
 ## Running it
 
-Dispatch **release** with `tag` (OpenSSL tag to build, e.g. `openssl-3.5.9`) and `release`
-(the release to publish under). Re-running with the same release replaces the assets in place.
-A push to this branch that touches `scripts/` or the workflow file builds it too.
+The workflow takes a single input, `tag` — the OpenSSL tag to build, default `openssl-3.5.9`.
+It publishes to the release `v<version>` titled `OpenSSL v<version>`, so re-running with the
+same tag replaces the assets in place.
+
+```sh
+# UI     Actions -> release -> Run workflow (pick the branch, override the tag if needed)
+# CLI
+gh workflow run release.yml --ref release -f tag=openssl-3.5.9
+# REST
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/invictus-dart/openssl/actions/workflows/release.yml/dispatches \
+  -d '{"ref":"release","inputs":{"tag":"openssl-3.5.9"}}'
+```
+
+Only `workflow_dispatch` starts this workflow; pushing to the branch does not.
 
 Repository settings that cannot be committed:
 
 1. **Actions enabled.** GitHub turns workflows off on forks of repositories that use a lot of
-   Actions, and a maintainer has to re-enable them from the Actions tab. This branch carries a
-   single workflow, so pushing here schedules exactly one run.
-2. **Write access for the release step.** If *Settings → Actions → General → Workflow
-   permissions* cannot be switched to *Read and write* (greyed out — an organization policy
-   above the repository), add a `RELEASE_TOKEN` repository secret holding a token with
-   `contents: write` on this repository. The publish job uses
-   `secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN`, so either works.
-3. **Default branch = `invictus-dart/release`**, otherwise GitHub shows no *Run workflow* button
+   Actions, and a maintainer has to re-enable them from the Actions tab.
+2. **Workflow permissions = Read and write** (*Settings → Actions → General*). The publish job
+   creates the release with `GITHUB_TOKEN`, which is read-only otherwise; an organization
+   policy above the repository can block this setting.
+3. **Default branch = `release`**, otherwise GitHub shows no *Run workflow* button
    (`workflow_dispatch` is only listed for files on the default branch).
 
 ## Local build
@@ -85,15 +91,15 @@ Repository settings that cannot be committed:
 ```sh
 SRC_DIR=~/src/openssl OUT_DIR=$PWD/out ./scripts/build.sh 3.5.9 linux-x86_64 linux-x86_64
 SRC_DIR=~/src/openssl OUT_DIR=$PWD/out SMOKE_CMD="xcrun -sdk macosx cc" \
-  ./scripts/build.sh 3.5.9 darwin64-arm64 macos-arm64 -mmacos-version-min=10.15
+  ./scripts/build.sh openssl-3.5.9 darwin64-arm64 macos-arm64 -mmacos-version-min=10.15
 ```
 
 ```powershell
-.\scripts\build.ps1 -Version 3.5.9 -Target VC-WIN64A -Suffix windows-x64 -VcArch x64 -SrcDir .\src
+.\scripts\build.ps1 -Tag openssl-3.5.9 -Target VC-WIN64A -Suffix windows-x64 -VcArch x64 -SrcDir .\src
 ```
 
-Requires `perl` and `make` on unix. On Windows OpenSSL's `VC-*` targets invoke MSVC's
-`cl` directly, so `cl` plus its `INCLUDE`/`LIB` environment has to be present — running
-`VsDevCmd.bat -arch=<arch>` from a Visual Studio installation provides both, the same script
-behind the "Developer Command Prompt" shortcut — together with `jom`
-and, for the x86/x64 targets only, NASM. Apple targets need Xcode.
+Unix needs `perl` and `make`. On Windows OpenSSL's `VC-*` targets invoke MSVC's `cl` directly,
+so `cl` plus its `INCLUDE`/`LIB` environment has to be present: run
+`VsDevCmd.bat -arch=<arch>` from a Visual Studio installation — the same script behind the
+"Developer Command Prompt" shortcut — and install `jom`, plus NASM for the x86/x64 targets.
+Apple targets need Xcode.
