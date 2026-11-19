@@ -54,8 +54,16 @@ jobs:
           curl -fsSL -o "$HOME/ndk.zip" "https://dl.google.com/android/repository/${NDK}-linux.zip"
           unzip -q "$HOME/ndk.zip" -d "$HOME/android-ndk"
 
-      - name: Add NDK to PATH
-        run: echo "$HOME/android-ndk/${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+      # OpenSSL's 15-android.conf derives the toolchain from ANDROID_NDK_ROOT
+      # and only takes the clang branch when the clang on PATH lives inside
+      # that directory. Without it the config falls through to the removed
+      # gcc wrappers and dies on "no NDK <triple>-gcc on $PATH".
+      - name: Set up NDK
+        run: |
+          ndk_root="$HOME/android-ndk/${NDK}"
+          test -x "$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
+          echo "$ndk_root/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+          echo "ANDROID_NDK_ROOT=$ndk_root" >> "$GITHUB_ENV"
 
       - name: Build bundle
         run: |

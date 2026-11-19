@@ -3,8 +3,9 @@
 #
 #   build-android.sh <tag> <target> <api> <src-dir> <out-dir>
 #
-# The asset is openssl-<version>-<target>.tar.gz. The NDK toolchain has to be
-# first on PATH; the API level is passed in rather than assumed.
+# The asset is openssl-<version>-<target>.tar.gz. ANDROID_NDK_ROOT must point at
+# the NDK and its llvm bin directory must be on PATH; the API level is passed in
+# rather than assumed.
 set -euo pipefail
 
 tag=${1:?tag}
