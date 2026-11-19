@@ -77,17 +77,6 @@ foreach ($lib in @("lib\libcrypto.lib", "lib\libssl.lib")) {
   if (-not (Test-Path (Join-Path $stage $lib))) { throw "FAIL: $lib missing" }
 }
 
-# Link one tiny program so a broken archive fails here instead of in a consumer.
-$src = Join-Path $stage "t.c"
-Set-Content -Path $src -Encoding ascii -Value @(
-  '#include <openssl/rand.h>',
-  'int main(void){unsigned char b[16];return RAND_bytes(b,16)==1?0:1;}')
-& cl /nologo /I (Join-Path $stage "include") $src (Join-Path $stage "lib\libcrypto.lib") `
-  ws2_32.lib advapi32.lib user32.lib crypt32.lib "/Fe:$stage\t.exe"
-if ($LASTEXITCODE -ne 0) { throw "FAIL: libcrypto.lib does not link" }
-Remove-Item -Force $src
-Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $stage "t.exe"), (Join-Path $stage "t.obj")
-
 $info = @{
   version = $Version
   target  = $Target

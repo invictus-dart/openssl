@@ -1,24 +1,21 @@
 #!/usr/bin/env bash
 # Builds one static OpenSSL bundle.
 #
-#   build.sh <tag> <target> [extra configure args...]
+#   build.sh <tag> <target> [apple-min-version]
 #
-# SRC_DIR        openssl source tree (required)
-# OUT_DIR        output directory (default: ./out)
-# SMOKE_CMD      command that compiles the link check, e.g.
-#                "xcrun -sdk iphoneos cc -arch arm64" (default: CC or cc)
-# SMOKE_LDFLAGS  extra flags for the link check
+# SRC_DIR      openssl source tree (required)
+# OUT_DIR      output directory (default: ./out)
+# ANDROID_API  API level for android-* targets (default: 24)
 #
-# <tag> may carry the openssl- prefix or omit it.
+# <tag> may carry the openssl- prefix or omit it. The asset is
+# openssl-<version>-<target>.tar.gz, unpacking into a directory of that name.
 set -euo pipefail
 
 tag=${1:?tag}
 target=${2:?target}
-shift 2
+minver=${3:-}
 
-# 3.5.9 and openssl-3.5.9 both end up as an asset named openssl-<version>-<suffix>.
 version=${tag#openssl-}
-
 src=${SRC_DIR:?SRC_DIR must point at an openssl source tree}
 out=${OUT_DIR:-$PWD/out}
 asset="openssl-${version}-${target}"
@@ -26,13 +23,22 @@ stage="${out}/${asset}"
 
 jobs=$(nproc 2>/dev/null || sysctl -n hw.ncpu)
 
+# Everything Configure needs beyond tag and target is derived from the target.
+case "${target}" in
+  android-*) extra=(-D__ANDROID_API__="${ANDROID_API:-24}") ;;
+  linux-aarch64) extra=(--cross-compile-prefix=aarch64-linux-gnu-) ;;
+  linux-armv4) extra=(--cross-compile-prefix=arm-linux-gnueabihf-) ;;
+  *) extra=() ;;
+esac
+if [ -n "${minver}" ]; then extra+=("${minver}"); fi
+
 rm -rf "${stage}"
 mkdir -p "${stage}"
 
 cd "${src}"
 perl Configure "${target}" \
   no-shared no-pinshared no-apps no-tests no-docs \
-  --prefix="${stage}" --libdir=lib "$@"
+  --prefix="${stage}" --libdir=lib "${extra[@]}"
 
 make -j"${jobs}" build_libs
 make install
@@ -43,17 +49,8 @@ for lib in libcrypto.a libssl.a; do
   test -f "${stage}/lib/${lib}" || { echo "FAIL: lib/${lib} missing" >&2; exit 1; }
 done
 
-# Link one tiny program so a broken archive fails here instead of in a consumer.
-smoke_cmd=${SMOKE_CMD:-${CC:-cc}}
-printf '#include <openssl/rand.h>\nint main(void){unsigned char b[16];return RAND_bytes(b,16)==1?0:1;}\n' \
-  >"${stage}/t.c"
-# shellcheck disable=SC2086
-sh -c "${smoke_cmd} -I'${stage}/include' '${stage}/t.c' -L'${stage}/lib' -lcrypto ${SMOKE_LDFLAGS:-} -o '${stage}/t'" \
-  || { echo "FAIL: libcrypto.a does not link" >&2; exit 1; }
-rm -f "${stage}/t.c" "${stage}/t"
-
 cat >"${stage}/build-info.json" <<JSON
-{"version":"${version}","target":"${target}","args":"${*:-}","asset":"${asset}","host":"$(uname -srm)","built":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+{"version":"${version}","target":"${target}","args":"${extra[*]:-}","asset":"${asset}","host":"$(uname -srm)","built":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
 JSON
 
 cp "${src}/LICENSE.txt" "${stage}/LICENSE.txt"

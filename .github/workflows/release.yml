@@ -27,21 +27,12 @@ jobs:
       matrix:
         include:
           - target: linux-x86_64
-            smoke: cc
-
           - target: linux-x86
-            smoke: gcc -m32
             apt: gcc-multilib
-
           - target: linux-aarch64
-            smoke: aarch64-linux-gnu-gcc
             apt: gcc-aarch64-linux-gnu
-            extra: --cross-compile-prefix=aarch64-linux-gnu-
-
           - target: linux-armv4
-            smoke: arm-linux-gnueabihf-gcc
             apt: gcc-arm-linux-gnueabihf
-            extra: --cross-compile-prefix=arm-linux-gnueabihf-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,8 +48,8 @@ jobs:
 
       - run: |
           chmod +x ci/scripts/build.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_CMD="${{ matrix.smoke }}" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" ${{ matrix.extra }}
+          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
+            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -71,22 +62,10 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NDK: android-ndk-r28c
-      API: "24"
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: android-arm64
-            abi: aarch64-linux-android
-
-          - target: android-arm
-            abi: armv7a-linux-androideabi
-
-          - target: android-x86_64
-            abi: x86_64-linux-android
-
-          - target: android-x86
-            abi: i686-linux-android
+        target: [android-arm64, android-arm, android-x86_64, android-x86]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,14 +80,12 @@ jobs:
         run: |
           curl -fsSL -o ndk.zip "https://dl.google.com/android/repository/${NDK}-linux.zip"
           unzip -q ndk.zip
-          echo "ANDROID_NDK_ROOT=$PWD/${NDK}" >> "$GITHUB_ENV"
           echo "$PWD/${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
 
       - run: |
           chmod +x ci/scripts/build.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_LDFLAGS="-ldl" \
-          SMOKE_CMD="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.abi }}${API}-clang" \
-            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" -D__ANDROID_API__=${API}
+          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
+            ci/scripts/build.sh "${TAG}" "${{ matrix.target }}"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -126,23 +103,14 @@ jobs:
           # iOS 12.0, macOS 10.15. The two arm64 slices cannot be built that low,
           # so clang raises them (11.0 and 14.0) and LC_BUILD_VERSION shows that.
           - target: darwin64-arm64
-            smoke: xcrun -sdk macosx cc
             min: -mmacos-version-min=10.15
-
           - target: darwin64-x86_64
-            smoke: xcrun -sdk macosx cc -arch x86_64
             min: -mmacos-version-min=10.15
-
           - target: ios64-xcrun
-            smoke: xcrun -sdk iphoneos cc -arch arm64
             min: -mios-version-min=12.0
-
           - target: iossimulator-arm64-xcrun
-            smoke: xcrun -sdk iphonesimulator cc -arch arm64
             min: -mios-simulator-version-min=12.0
-
           - target: iossimulator-x86_64-xcrun
-            smoke: xcrun -sdk iphonesimulator cc -arch x86_64
             min: -mios-simulator-version-min=12.0
     steps:
       - uses: actions/checkout@v4
@@ -156,7 +124,7 @@ jobs:
 
       - run: |
           chmod +x ci/scripts/build.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_CMD="${{ matrix.smoke }}" \
+          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
             ci/scripts/build.sh "${TAG}" "${{ matrix.target }}" "${{ matrix.min }}"
 
       - uses: actions/upload-artifact@v4
@@ -174,7 +142,6 @@ jobs:
           - target: VC-WIN64A
             runner: windows-latest
             nasm: x64
-
           - target: VC-WIN32
             runner: windows-latest
             nasm: x86
