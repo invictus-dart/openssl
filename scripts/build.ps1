@@ -16,14 +16,16 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
-# Import the MSVC environment for the requested architecture. No -requires
-# filter: vcvarsall is the authority, and the ARM64 runner only carries the
-# ARM64 toolset.
+# Import the MSVC environment for the requested architecture. VsDevCmd.bat is
+# what the "Developer Command Prompt" shortcut runs; its arch names differ
+# from the ones vcvarsall takes, hence the mapping.
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vsPath = & $vswhere -latest -products * -property installationPath
 if (-not $vsPath) { throw "Visual Studio not found" }
-$vcvars = Join-Path $vsPath "VC\Auxiliary\Build\vcvarsall.bat"
-$vcEnv = & cmd /c "`"$vcvars`" $VcArch && set"
+$devArch = switch ($VcArch) { "x64" { "amd64" } "x86" { "x86" } default { $VcArch } }
+$hostArch = if ($VcArch -eq "arm64") { "arm64" } else { "amd64" }
+$vsdev = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
+$vcEnv = & cmd /c "`"$vsdev`" -arch=$devArch -host_arch=$hostArch -no_logo && set"
 $imported = 0
 foreach ($line in $vcEnv) {
   if ($line -match '^([^=]+)=(.*)$') {
@@ -31,7 +33,7 @@ foreach ($line in $vcEnv) {
     $imported++
   }
 }
-if ($imported -lt 10) { throw "vcvarsall $VcArch produced no environment" }
+if ($imported -lt 10) { throw "VsDevCmd.bat -arch=$devArch produced no environment" }
 foreach ($tool in @("perl", "cl", "jom")) {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
     throw "tool '$tool' is not on PATH after importing the $VcArch environment"

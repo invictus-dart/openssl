@@ -91,5 +91,6 @@ SRC_DIR=~/src/openssl OUT_DIR=$PWD/out SMOKE_CMD="xcrun -sdk macosx cc" \
 
 Requires `perl` and `make` on unix. On Windows OpenSSL's `VC-*` targets invoke MSVC's
 `cl` directly, so `cl` plus its `INCLUDE`/`LIB` environment has to be present — running
-`vcvarsall.bat <arch>` from a Visual Studio installation provides both — together with `jom`
+`VsDevCmd.bat -arch=<arch>` from a Visual Studio installation provides both, the same script
+behind the "Developer Command Prompt" shortcut — together with `jom`
 and, for the x86/x64 targets only, NASM. Apple targets need Xcode.
