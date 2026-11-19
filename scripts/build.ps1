@@ -60,14 +60,7 @@ finally {
   Pop-Location
 }
 
-# Everything install lays down for a running program; a static consumer never
-# reads it.
-Remove-Item -Force -ErrorAction SilentlyContinue (Join-Path $stage "include\openssl\applink.c")
-foreach ($dir in @("bin", "ssl", "lib\ossl-modules", "lib\cmake", "lib\pkgconfig")) {
-  Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $stage $dir)
-}
-Get-ChildItem (Join-Path $stage "lib") -Filter "engines-*" -Directory -ErrorAction SilentlyContinue |
-  Remove-Item -Recurse -Force
+# The archive is the install tree as-is; nothing is pruned.
 
 foreach ($lib in @("lib\libcrypto.lib", "lib\libssl.lib")) {
   if (-not (Test-Path (Join-Path $stage $lib))) { throw "FAIL: $lib missing" }

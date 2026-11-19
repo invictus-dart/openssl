@@ -10,8 +10,8 @@ the artifacts are unpatched upstream builds.
 | --- | --- |
 | name | `openssl-<version>-<suffix>.tar.gz` |
 | root directory | the file name without `.tar.gz` |
-| contents | `include/openssl/*.h`, `lib/libcrypto.{a,lib}`, `lib/libssl.{a,lib}`, `build-info.json`, `LICENSE.txt` |
-| not included | `applink.c`, `bin/`, `ssl/`, engines, modules, `lib/cmake`, `lib/pkgconfig` |
+| contents | the complete `make install` tree: `include/`, `lib/`, `bin/`, `ssl/`, plus `build-info.json` and `LICENSE.txt` |
+| not pruned | engines, modules, cmake/pkgconfig and `applink.c` ship as install produces them |
 
 The root directory has to match the file name: consumers extract with a plain `tar -xzf` and
 link against `<root>/lib`, with headers from `<root>/include`.
@@ -35,16 +35,17 @@ one header that differs per triple, the rest are identical.
 | `android-x86` | `android-x86` | same |
 | `macos-arm64` | `darwin64-arm64` | macos-14, `-mmacos-version-min=11.0` |
 | `macos-x86_64` | `darwin64-x86_64` | macos-14, `-mmacos-version-min=10.15` |
-| `ios-arm64` | `ios64-xcrun` | macos-14, `-mios-version-min=13.0` |
+| `ios-arm64` | `ios64-xcrun` | macos-14, `-mios-version-min=12.0` |
 | `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-14, `-mios-simulator-version-min=14.0` |
-| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-14, `-mios-simulator-version-min=13.0` |
+| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
 | `windows-x64` | `VC-WIN64A` | windows-2022, NASM x64 |
 | `windows-ia32` | `VC-WIN32` | windows-2022, NASM x86 |
 | `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (only image with the ARM64 toolset; this target needs no NASM) |
 
-The Apple floors are the deployment targets an app gets by default (iOS 13.0, macOS 10.15);
-`macos-arm64` and `ios-simulator-arm64` cannot be built lower and use the value clang would
-clamp to anyway.
+Each Apple floor is the lowest that slice builds at, fixed in the workflow rather than derived
+from any consumer setting. `macos-arm64` and `ios-simulator-arm64` cannot go lower: clang
+raises anything beneath them to 11.0 and 14.0. Without the flag the archive would inherit the
+SDK default instead — the runner's own OS version — which older apps cannot link against.
 
 ## Build steps
 
@@ -55,7 +56,7 @@ Every bundle is produced by the same three steps:
 2. `build_libs` in parallel — `make -j<n>`, or `jom /J <n>` with `CL=... /FS` on Windows so
    parallel `cl` calls do not collide on `ossl_static.pdb`.
 3. `install` (`jom install /J 1` on Windows, because the install rules rewrite `makefile` and
-   cannot run concurrently). Runtime-only files are then removed.
+   cannot run concurrently). That install tree is what gets archived, unmodified.
 
 A one-line program is linked against `libcrypto` before packaging, so an unusable archive fails
 in CI instead of at the consumer.

@@ -33,11 +33,7 @@ perl Configure "${target}" \
 make -j"${jobs}" build_libs
 make install
 
-# Everything install lays down for a running program; a static consumer never
-# reads it.
-rm -f "${stage}/include/openssl/applink.c"
-rm -rf "${stage}/bin" "${stage}/ssl" "${stage}"/lib/engines-* \
-  "${stage}/lib/ossl-modules" "${stage}/lib/cmake" "${stage}/lib/pkgconfig"
+# The archive is the install tree as-is; nothing is pruned.
 
 for lib in libcrypto.a libssl.a; do
   test -f "${stage}/lib/${lib}" || { echo "FAIL: lib/${lib} missing" >&2; exit 1; }
