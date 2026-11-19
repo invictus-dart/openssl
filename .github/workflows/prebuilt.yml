@@ -1,31 +1,30 @@
 name: prebuilt
 
-# Builds static OpenSSL bundles for every target triple the mars hook needs and
-# publishes them as release assets. See PREBUILT.md for the layout and
-# for the checks every bundle has to pass.
+# Builds static OpenSSL bundles for a fixed set of target triples and publishes
+# them as release assets. Assets are named openssl-<version>-<suffix>.tar.gz and
+# unpack into a directory of exactly the same name.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "OpenSSL tag to build"
+        description: OpenSSL tag to build
         required: true
         default: openssl-3.5.9
       release:
-        description: "Release tag to publish the assets under"
+        description: Release to publish the assets under
         required: true
         default: openssl-3.5.9
   push:
     branches: [prebuilt]
-    paths:
-      - scripts/**
-      - .github/workflows/prebuilt.yml
+    paths: [scripts/**, .github/workflows/prebuilt.yml]
 
 permissions:
   contents: write
 
 env:
-  OPENSSL_TAG: ${{ inputs.tag || 'openssl-3.5.9' }}
+  TAG: ${{ inputs.tag || 'openssl-3.5.9' }}
+  VERSION: ${{ inputs.tag || 'openssl-3.5.9' }}
 
 jobs:
   linux:
@@ -34,89 +33,56 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - suffix: linux-x86_64
-            target: linux-x86_64
-            smoke: cc
-            run_smoke: 1
-          - suffix: linux-ia32
-            target: linux-x86
-            smoke: gcc -m32
-            apt: gcc-multilib
-          - suffix: linux-aarch64
-            target: linux-aarch64
-            smoke: aarch64-linux-gnu-gcc
-            apt: gcc-aarch64-linux-gnu
-            extra: --cross-compile-prefix=aarch64-linux-gnu-
-          - suffix: linux-armv4
-            target: linux-armv4
-            smoke: arm-linux-gnueabihf-gcc
-            apt: gcc-arm-linux-gnueabihf
-            extra: --cross-compile-prefix=arm-linux-gnueabihf-
+          - { suffix: linux-x86_64,  target: linux-x86_64,  smoke: cc }
+          - { suffix: linux-ia32,    target: linux-x86,     smoke: "gcc -m32", apt: gcc-multilib }
+          - { suffix: linux-aarch64, target: linux-aarch64, smoke: aarch64-linux-gnu-gcc, apt: gcc-aarch64-linux-gnu, extra: --cross-compile-prefix=aarch64-linux-gnu- }
+          - { suffix: linux-armv4,   target: linux-armv4,   smoke: arm-linux-gnueabihf-gcc, apt: gcc-arm-linux-gnueabihf, extra: --cross-compile-prefix=arm-linux-gnueabihf- }
     steps:
       - uses: actions/checkout@v4
         with: { path: ci }
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.OPENSSL_TAG }}
-          path: src
-      - name: Install cross toolchain
+        with: { ref: "${{ env.TAG }}", path: src }
+      - run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
         if: matrix.apt
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
-      - name: Build bundle
-        run: |
-          chmod +x ci/scripts/build-unix.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
-          SMOKE_CMD="${{ matrix.smoke }}" SMOKE_RUN="${{ matrix.run_smoke || 0 }}" \
-            ci/scripts/build-unix.sh "${OPENSSL_TAG#openssl-}" \
-              "${{ matrix.target }}" "${{ matrix.suffix }}" ${{ matrix.extra }}
+      - run: |
+          chmod +x ci/scripts/build.sh
+          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_CMD="${{ matrix.smoke }}" \
+            ci/scripts/build.sh "${VERSION}" "${{ matrix.target }}" "${{ matrix.suffix }}" ${{ matrix.extra }}
       - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.suffix }}
-          path: out/*.tar.gz
-          if-no-files-found: error
+        with: { name: "${{ matrix.suffix }}", path: out/*.tar.gz, if-no-files-found: error }
 
-  # Android is cross-compiled from Linux: the NDK ships native linux-x86_64
-  # host binaries, so no Rosetta or macOS runner is involved.
+  # Cross-compiled on Linux: the NDK ships native linux-x86_64 host binaries.
   android:
     runs-on: ubuntu-24.04
     env:
-      NDK_VERSION: 28.2.13676358
-      ANDROID_API: 24
+      NDK: android-ndk-r28c
+      API: "24"
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { suffix: android-arm64, target: android-arm64, abi: arm64, clang: aarch64-linux-android24 }
-          - { suffix: android-arm,   target: android-arm,   abi: arm,    clang: armv7a-linux-androideabi24 }
-          - { suffix: android-x86_64, target: android-x86_64, abi: x86_64, clang: x86_64-linux-android24 }
-          - { suffix: android-x86,   target: android-x86,   abi: x86,    clang: i686-linux-android24 }
+          - { suffix: android-arm64,  target: android-arm64,  abi: aarch64-linux-android }
+          - { suffix: android-arm,    target: android-arm,    abi: armv7a-linux-androideabi }
+          - { suffix: android-x86_64, target: android-x86_64, abi: x86_64-linux-android }
+          - { suffix: android-x86,    target: android-x86,    abi: i686-linux-android }
     steps:
       - uses: actions/checkout@v4
         with: { path: ci }
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.OPENSSL_TAG }}
-          path: src
-      - name: Install NDK
-        run: |
+        with: { ref: "${{ env.TAG }}", path: src }
+      - run: |
           curl -fsSL -o ndk.zip "https://dl.google.com/android/repository/android-ndk-r28c-linux.zip"
           unzip -q ndk.zip
-          echo "ANDROID_NDK_ROOT=$PWD/android-ndk-r28c" >> "$GITHUB_ENV"
-          echo "$PWD/android-ndk-r28c/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
-      - name: Build bundle
-        run: |
-          chmod +x ci/scripts/build-unix.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
-          SMOKE_CMD="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.clang }}-clang" \
-          SMOKE_LDFLAGS="-ldl" \
-            ci/scripts/build-unix.sh "${OPENSSL_TAG#openssl-}" \
-              "${{ matrix.target }}" "${{ matrix.suffix }}" \
-              -D__ANDROID_API__=${ANDROID_API}
+          echo "ANDROID_NDK_ROOT=$PWD/$NDK" >> "$GITHUB_ENV"
+          echo "$PWD/$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+      - run: |
+          chmod +x ci/scripts/build.sh
+          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_LDFLAGS="-ldl" \
+          SMOKE_CMD="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.abi }}${API}-clang" \
+            ci/scripts/build.sh "${VERSION}" "${{ matrix.target }}" "${{ matrix.suffix }}" \
+              -D__ANDROID_API__=${API}
       - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.suffix }}
-          path: out/*.tar.gz
-          if-no-files-found: error
+        with: { name: "${{ matrix.suffix }}", path: out/*.tar.gz, if-no-files-found: error }
 
   apple:
     runs-on: macos-14
@@ -124,52 +90,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The version-min flags mirror what the mars hook passes from the
-          # consuming app's deployment target. A prebuilt bundle cannot follow
-          # each app, so it ships the oldest target each slice supports; any
-          # newer app target still links against these.
-          - suffix: macos-arm64
-            target: darwin64-arm64
-            smoke: xcrun -sdk macosx cc
-            run_smoke: 1
-            min: -mmacos-version-min=11.0
-          - suffix: macos-x86_64
-            target: darwin64-x86_64
-            smoke: xcrun -sdk macosx cc -arch x86_64
-            min: -mmacos-version-min=10.15
-          - suffix: ios-arm64
-            target: ios64-xcrun
-            smoke: xcrun -sdk iphoneos cc -arch arm64
-            min: -mios-version-min=12.0
-          - suffix: ios-simulator-arm64
-            target: iossimulator-arm64-xcrun
-            smoke: xcrun -sdk iphonesimulator cc -arch arm64
-            # arm64 simulator slices cannot go below iOS 14: clang clamps a
-            # lower floor up to 14.0, so ask for the floor it will honour.
-            min: -mios-simulator-version-min=14.0
-          - suffix: ios-simulator-x86_64
-            target: iossimulator-x86_64-xcrun
-            smoke: xcrun -sdk iphonesimulator cc -arch x86_64
-            min: -mios-simulator-version-min=12.0
+          # Floors are the deployment targets a consuming app passes by default
+          # (iOS 13.0, macOS 10.15). Two slices refuse to build lower and clamp
+          # anyway, so they ask for the clamp value directly.
+          - { suffix: macos-arm64,          target: darwin64-arm64,           smoke: "xcrun -sdk macosx cc",                      min: -mmacos-version-min=11.0 }
+          - { suffix: macos-x86_64,         target: darwin64-x86_64,          smoke: "xcrun -sdk macosx cc -arch x86_64",         min: -mmacos-version-min=10.15 }
+          - { suffix: ios-arm64,            target: ios64-xcrun,              smoke: "xcrun -sdk iphoneos cc -arch arm64",        min: -mios-version-min=13.0 }
+          - { suffix: ios-simulator-arm64,  target: iossimulator-arm64-xcrun, smoke: "xcrun -sdk iphonesimulator cc -arch arm64", min: -mios-simulator-version-min=14.0 }
+          - { suffix: ios-simulator-x86_64, target: iossimulator-x86_64-xcrun, smoke: "xcrun -sdk iphonesimulator cc -arch x86_64", min: -mios-simulator-version-min=13.0 }
     steps:
       - uses: actions/checkout@v4
         with: { path: ci }
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.OPENSSL_TAG }}
-          path: src
-      - name: Build bundle
-        run: |
-          chmod +x ci/scripts/build-unix.sh
-          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" \
-          SMOKE_CMD="${{ matrix.smoke }}" SMOKE_RUN="${{ matrix.run_smoke || 0 }}" \
-            ci/scripts/build-unix.sh "${OPENSSL_TAG#openssl-}" \
-              "${{ matrix.target }}" "${{ matrix.suffix }}" "${{ matrix.min }}"
+        with: { ref: "${{ env.TAG }}", path: src }
+      - run: |
+          chmod +x ci/scripts/build.sh
+          SRC_DIR="$PWD/src" OUT_DIR="$PWD/out" SMOKE_CMD="${{ matrix.smoke }}" \
+            ci/scripts/build.sh "${VERSION}" "${{ matrix.target }}" "${{ matrix.suffix }}" "${{ matrix.min }}"
       - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.suffix }}
-          path: out/*.tar.gz
-          if-no-files-found: error
+        with: { name: "${{ matrix.suffix }}", path: out/*.tar.gz, if-no-files-found: error }
 
   windows:
     runs-on: ${{ matrix.runner }}
@@ -177,60 +116,46 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { suffix: windows-x64,   target: VC-WIN64A,    vc_arch: x64,   runner: windows-2022,   nasm_arch: x64 }
-          - { suffix: windows-ia32,  target: VC-WIN32,     vc_arch: x86,   runner: windows-2022,   nasm_arch: x86 }
-          # windows-2022 has no ARM64 MSVC toolset, so this leg needs the ARM64
-          # runner (as upstream's os-zoo does). VC-WIN64-ARM has no asm_arch,
-          # which is why Configure disables asm and NASM is not needed here.
+          - { suffix: windows-x64,   target: VC-WIN64A,    vc_arch: x64,   runner: windows-2022,  nasm: x64 }
+          - { suffix: windows-ia32,  target: VC-WIN32,     vc_arch: x86,   runner: windows-2022,  nasm: x86 }
+          # windows-2022 carries no ARM64 MSVC toolset. VC-WIN64-ARM has no
+          # asm_arch, so Configure disables asm and NASM is not needed.
           - { suffix: windows-arm64, target: VC-WIN64-ARM, vc_arch: arm64, runner: windows-11-arm }
     steps:
       - uses: actions/checkout@v4
         with: { path: ci }
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.OPENSSL_TAG }}
-          path: src
+        with: { ref: "${{ env.TAG }}", path: src }
       - name: Install Strawberry Perl if missing
         shell: pwsh
         run: |
-          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
-            choco install strawberryperl -y
-          }
+          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) { choco install strawberryperl -y }
       - name: Install NASM
-        if: matrix.nasm_arch
+        if: matrix.nasm
         shell: pwsh
         run: |
-          # VC targets assemble with NASM; x86 and x64 need different installers.
-          $arch = '${{ matrix.nasm_arch }}'
+          $arch = '${{ matrix.nasm }}'
           $win = if ($arch -eq 'x86') { 'win32' } else { 'win64' }
           $dir = if ($arch -eq 'x86') { 'C:\Program Files (x86)\NASM' } else { 'C:\Program Files\NASM' }
           $installer = "nasm-3.01-installer-$arch.exe"
-          Invoke-WebRequest -Uri "https://www.nasm.us/pub/nasm/releasebuilds/3.01/$win/$installer" `
-            -OutFile $installer -MaximumRetryCount 3 -RetryIntervalSec 10
+          Invoke-WebRequest -Uri "https://www.nasm.us/pub/nasm/releasebuilds/3.01/$win/$installer" -OutFile $installer
           Start-Process -FilePath ".\$installer" -ArgumentList '/S' -Wait
-          $dir | Out-File -FilePath $env:GITHUB_PATH -Append
+          $dir | Out-File $env:GITHUB_PATH -Append
       - name: Install jom
         shell: pwsh
         run: |
-          # The hook builds with jom (nmake has no parallel mode); same source
-          # as upstream's fork path.
           New-Item -ItemType Directory -Force -Path C:\jom | Out-Null
-          Invoke-WebRequest -Uri "https://download.qt.io/official_releases/jom/jom_1_1_7.zip" `
-            -OutFile C:\jom\jom.zip -MaximumRetryCount 3 -RetryIntervalSec 10
+          Invoke-WebRequest -Uri "https://download.qt.io/official_releases/jom/jom_1_1_7.zip" -OutFile C:\jom\jom.zip
           Expand-Archive -Path C:\jom\jom.zip -DestinationPath C:\jom -Force
-          "C:\jom" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "C:\jom" | Out-File $env:GITHUB_PATH -Append
       - name: Build bundle
         shell: pwsh
         run: |
-          $version = $env:OPENSSL_TAG -replace '^openssl-', ''
-          .\ci\scripts\build-windows.ps1 -Version $version `
-            -Target '${{ matrix.target }}' -Suffix '${{ matrix.suffix }}' `
-            -VcArch '${{ matrix.vc_arch }}' -SrcDir "$PWD\src" -OutDir "$PWD\out"
+          .\ci\scripts\build.ps1 -Version $env:VERSION -Target '${{ matrix.target }}' `
+            -Suffix '${{ matrix.suffix }}' -VcArch '${{ matrix.vc_arch }}' `
+            -SrcDir "$PWD\src" -OutDir "$PWD\out"
       - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.suffix }}
-          path: out/*.tar.gz
-          if-no-files-found: error
+        with: { name: "${{ matrix.suffix }}", path: out/*.tar.gz, if-no-files-found: error }
 
   publish:
     needs: [linux, android, apple, windows]
@@ -239,41 +164,17 @@ jobs:
       - uses: actions/checkout@v4
         with: { path: ci }
       - uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-      - name: Verify the bundle matrix
-        run: |
-          chmod +x ci/scripts/verify-matrix.sh
-          ci/scripts/verify-matrix.sh dist
-      - name: Manifest and checksums
-        run: |
-          cd dist
-          sha256sum openssl-*.tar.gz > SHA256SUMS
-          python3 - <<'PY'
-          import json, hashlib, pathlib, re
-          assets = []
-          for p in sorted(pathlib.Path('.').glob('openssl-*.tar.gz')):
-              m = re.match(r'openssl-(\d+\.\d+\.\d+)-(.+)\.tar\.gz', p.name)
-              assets.append({
-                  'asset': p.name,
-                  'version': m.group(1),
-                  'suffix': m.group(2),
-                  'sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
-                  'size': p.stat().st_size,
-                  'url': f'{p.name}',
-              })
-          json.dump({'assets': assets}, open('manifest.json', 'w'), indent=2)
-          PY
+        with: { path: dist, merge-multiple: true }
+      - run: cd dist && sha256sum openssl-*.tar.gz > SHA256SUMS && ls -l
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE: ${{ inputs.release || 'openssl-3.5.9' }}
         run: |
-          tag="${{ inputs.release || 'openssl-3.5.9' }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/*.tar.gz dist/manifest.json dist/SHA256SUMS --clobber
+          if gh release view "$RELEASE" >/dev/null 2>&1; then
+            gh release upload "$RELEASE" dist/*.tar.gz dist/SHA256SUMS --clobber
           else
-            gh release create "$tag" dist/*.tar.gz dist/manifest.json dist/SHA256SUMS \
-              --title "OpenSSL $tag prebuilt" \
-              --notes "Static libcrypto/libssl bundles for the invictus-dart mars hook."
+            gh release create "$RELEASE" dist/*.tar.gz dist/SHA256SUMS \
+              --title "OpenSSL $RELEASE prebuilt" \
+              --notes "Static libcrypto/libssl bundles. See README.md."
           fi
