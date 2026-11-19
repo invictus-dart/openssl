@@ -20,24 +20,31 @@ The archive root matches the file name, so consumers unpack with `tar -xzf` and 
 
 ## Targets
 
-| suffix | configure target | runner |
-| --- | --- | --- |
-| `linux-x86_64` | `linux-x86_64` | ubuntu-latest |
-| `linux-ia32` | `linux-x86` | ubuntu-latest (gcc-multilib) |
-| `linux-aarch64` | `linux-aarch64` | ubuntu-latest (cross) |
-| `linux-armv4` | `linux-armv4` | ubuntu-latest (cross) |
-| `android-arm64` | `android-arm64` | ubuntu-latest + NDK r28c, `-D__ANDROID_API__=24` |
-| `android-arm` | `android-arm` | same |
-| `android-x86_64` | `android-x86_64` | same |
-| `android-x86` | `android-x86` | same |
-| `macos-arm64` | `darwin64-arm64` | macos-latest, `-mmacos-version-min=10.15` |
-| `macos-x86_64` | `darwin64-x86_64` | macos-latest, `-mmacos-version-min=10.15` |
-| `ios-arm64` | `ios64-xcrun` | macos-latest, `-mios-version-min=12.0` |
-| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-latest, `-mios-simulator-version-min=12.0` |
-| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-latest, `-mios-simulator-version-min=12.0` |
-| `windows-x64` | `VC-WIN64A` | windows-latest, NASM x64 |
-| `windows-ia32` | `VC-WIN32` | windows-latest, NASM x86 |
-| `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (no ARM64 MSVC toolset elsewhere; this target needs no NASM) |
+| suffix | configure target | name on the platform | build notes |
+| --- | --- | --- | --- |
+| `linux-x86_64` | `linux-x86_64` | `x86_64` (Rust `x86_64-unknown-linux-gnu`) | ubuntu-latest |
+| `linux-ia32` | `linux-x86` | `i686` (`i686-unknown-linux-gnu`) | ubuntu-latest, gcc-multilib |
+| `linux-aarch64` | `linux-aarch64` | `aarch64` (`aarch64-unknown-linux-gnu`) | ubuntu-latest, cross |
+| `linux-armv4` | `linux-armv4` | `armv7l` (`armv7-unknown-linux-gnueabihf`), built at the ARMv4 baseline | ubuntu-latest, cross |
+| `android-arm64` | `android-arm64` | `arm64-v8a` (clang `aarch64-linux-android24`) | ubuntu-latest + NDK r28c |
+| `android-arm` | `android-arm` | `armeabi-v7a` (`armv7a-linux-androideabi24`) | same |
+| `android-x86_64` | `android-x86_64` | `x86_64` | same |
+| `android-x86` | `android-x86` | `x86` | same |
+| `macos-arm64` | `darwin64-arm64` | `arm64` | macos-latest, `-mmacos-version-min=10.15` |
+| `macos-x86_64` | `darwin64-x86_64` | `x86_64` | macos-latest, same floor |
+| `ios-arm64` | `ios64-xcrun` | `arm64`, device | macos-latest, `-mios-version-min=12.0` |
+| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | `arm64`, simulator | macos-latest, `-mios-simulator-version-min=12.0` |
+| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | `x86_64`, simulator | macos-latest, same floor |
+| `windows-x64` | `VC-WIN64A` | `x64` | windows-latest, NASM x64 |
+| `windows-ia32` | `VC-WIN32` | `x86` / `Win32` | windows-latest, NASM x86 |
+| `windows-arm64` | `VC-WIN64-ARM` | `arm64` | windows-11-arm, no NASM |
+
+Three naming layers meet here. The *configure target* is OpenSSL's own vocabulary and cannot be
+changed. The *suffix* is this repository's, and its arch token copies the platform's own name —
+`x86_64` on Linux, `arm64-v8a` on Android, `arm64` on Apple, `x64` on Windows — so it reads the
+way a consumer on that platform names things. The *name on the platform* column is what a
+toolchain will ask for when linking. Libraries are `libcrypto.a` and `libssl.a` everywhere
+except Windows, where they are `libcrypto.lib` and `libssl.lib`.
 
 Each Apple platform gets one floor: iOS 12.0, macOS 10.15. `macos-arm64` and
 `ios-simulator-arm64` cannot be built that low, so clang raises them to 11.0 and 14.0 and
