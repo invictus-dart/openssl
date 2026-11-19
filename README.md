@@ -40,7 +40,7 @@ one header that differs per triple, the rest are identical.
 | `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-latest, `-mios-simulator-version-min=12.0` |
 | `windows-x64` | `VC-WIN64A` | windows-latest, NASM x64 |
 | `windows-ia32` | `VC-WIN32` | windows-latest, NASM x86 |
-| `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (only image with the ARM64 toolset; this target needs no NASM) |
+| `windows-arm64` | `VC-WIN64-ARM` | windows-11-vs2026-arm (the only ARM64 image; pinned to VS 2026 so a toolchain upgrade cannot slip in; this target needs no NASM) |
 
 Both Apple platforms use one floor each: iOS 12.0, macOS 10.15. Two slices cannot be built at
 that floor — `macos-arm64` and `ios-simulator-arm64` are raised by clang to 11.0 and 14.0 — and
