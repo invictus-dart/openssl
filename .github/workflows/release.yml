@@ -1,8 +1,8 @@
 name: release
 
-# Builds static OpenSSL bundles for a fixed set of targets and publishes them
-# as one release per OpenSSL version: tag openssl-3.5.9 becomes release tag
-# v3.5.9, titled "OpenSSL v3.5.9", holding openssl-3.5.9-<suffix>.tar.gz.
+# Builds static OpenSSL bundles per platform and publishes them as one release
+# per OpenSSL version: tag openssl-3.5.9 becomes release tag v3.5.9, titled
+# "OpenSSL v3.5.9", holding openssl-3.5.9-<target>.tar.gz.
 
 on:
   workflow_dispatch:
@@ -20,42 +20,9 @@ env:
   TAG: ${{ inputs.tag }}
 
 jobs:
-  linux:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: linux-x86_64
-          - target: linux-x86
-            apt: gcc-multilib
-          - target: linux-aarch64
-            apt: gcc-aarch64-linux-gnu
-          - target: linux-armv4
-            apt: gcc-arm-linux-gnueabihf
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
-          path: src
-
-      - if: matrix.apt
-        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
-
-      - name: Build bundle
-        run: |
-          chmod +x scripts/build-linux.sh
-          scripts/build-linux.sh "${TAG}" "${{ matrix.target }}" "$PWD/src" "$PWD/out"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.target }}
-          path: out/*.tar.gz
-          if-no-files-found: error
-
-  # Cross-compiled on Linux because the NDK ships native linux-x86_64 host tools.
+  # The NDK ships native linux-x86_64 host tools, so Android builds run on Linux.
+  # Its 700 MB download is worth caching: every matrix leg is a separate runner
+  # and would otherwise fetch a copy of its own.
   android:
     runs-on: ubuntu-latest
     env:
@@ -73,11 +40,22 @@ jobs:
           ref: ${{ env.TAG }}
           path: src
 
+      - name: Cache NDK
+        id: ndk
+        uses: actions/cache@v4
+        with:
+          path: ~/android-ndk
+          key: ${{ env.NDK }}-linux
+
       - name: Install NDK
+        if: steps.ndk.outputs.cache-hit != 'true'
         run: |
-          curl -fsSL -o ndk.zip "https://dl.google.com/android/repository/${NDK}-linux.zip"
-          unzip -q ndk.zip
-          echo "$PWD/${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/android-ndk"
+          curl -fsSL -o "$HOME/ndk.zip" "https://dl.google.com/android/repository/${NDK}-linux.zip"
+          unzip -q "$HOME/ndk.zip" -d "$HOME/android-ndk"
+
+      - name: Add NDK to PATH
+        run: echo "$HOME/android-ndk/${NDK}/toolchains/llvm/prebuilt/linux-x86_64/bin" >> "$GITHUB_PATH"
 
       - name: Build bundle
         run: |
@@ -90,39 +68,10 @@ jobs:
           path: out/*.tar.gz
           if-no-files-found: error
 
-  macos:
-    runs-on: macos-latest
-    env:
-      # Deployment floor. darwin64-arm64 cannot be built that low, so clang
-      # raises it to 11.0 and LC_BUILD_VERSION records the raised value.
-      TARGET_VERSION: "10.15"
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [darwin64-arm64, darwin64-x86_64]
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
-          path: src
-
-      - name: Build bundle
-        run: |
-          chmod +x scripts/build-macos.sh
-          scripts/build-macos.sh "${TAG}" "${{ matrix.target }}" "${TARGET_VERSION}" "$PWD/src" "$PWD/out"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.target }}
-          path: out/*.tar.gz
-          if-no-files-found: error
-
+  # The arm64 simulator slice cannot be built at 12.0; clang raises it to 14.0.
   ios:
     runs-on: macos-latest
     env:
-      # Deployment floor, applied to the device and simulator builds alike.
       TARGET_VERSION: "12.0"
     strategy:
       fail-fast: false
@@ -147,23 +96,16 @@ jobs:
           path: out/*.tar.gz
           if-no-files-found: error
 
-  windows:
-    runs-on: ${{ matrix.runner }}
+  # darwin64-arm64 cannot be built at 10.15; clang raises it to 11.0. LC_BUILD_VERSION
+  # records the raised value, so a bundle may report a higher floor than asked for.
+  macos:
+    runs-on: macos-latest
+    env:
+      TARGET_VERSION: "10.15"
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: VC-WIN64A
-            runner: windows-latest
-            nasm: x64
-          - target: VC-WIN32
-            runner: windows-latest
-            nasm: x86
-
-          # windows-2022 carries no ARM64 MSVC toolset. VC-WIN64-ARM has no
-          # asm_arch, so Configure disables asm and NASM is not needed here.
-          - target: VC-WIN64-ARM
-            runner: windows-11-arm
+        target: [darwin64-arm64, darwin64-x86_64]
     steps:
       - uses: actions/checkout@v4
 
@@ -172,12 +114,47 @@ jobs:
           ref: ${{ env.TAG }}
           path: src
 
-      - name: Install Strawberry Perl if missing
+      - name: Build bundle
+        run: |
+          chmod +x scripts/build-macos.sh
+          scripts/build-macos.sh "${TAG}" "${{ matrix.target }}" "${TARGET_VERSION}" "$PWD/src" "$PWD/out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: out/*.tar.gz
+          if-no-files-found: error
+
+  # ARM64 is cross-compiled: windows-latest installs the ARM64 MSVC toolset, so the
+  # x64 image builds all three targets and no arm64 runner is needed. VC-WIN64-ARM has
+  # no asm_arch, so Configure disables asm and NASM is installed for x86/x64 only.
+  # NASM and jom are a couple of megabytes, not worth a cache.
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [VC-WIN64A, VC-WIN32, VC-WIN64-ARM]
+        include:
+          - target: VC-WIN64A
+            nasm: x64
+          - target: VC-WIN32
+            nasm: x86
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          path: src
+
+      - name: Install jom
         shell: pwsh
         run: |
-          if (-not (Get-Command perl -ErrorAction SilentlyContinue)) {
-            choco install strawberryperl -y
-          }
+          New-Item -ItemType Directory -Force -Path C:\jom | Out-Null
+          Invoke-WebRequest -Uri "https://download.qt.io/official_releases/jom/jom_1_1_7.zip" -OutFile C:\jom\jom.zip
+          Expand-Archive -Path C:\jom\jom.zip -DestinationPath C:\jom -Force
+          "C:\jom" | Out-File $env:GITHUB_PATH -Append
 
       - name: Install NASM
         if: matrix.nasm
@@ -191,14 +168,6 @@ jobs:
           Start-Process -FilePath ".\$installer" -ArgumentList '/S' -Wait
           $dir | Out-File $env:GITHUB_PATH -Append
 
-      - name: Install jom
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path C:\jom | Out-Null
-          Invoke-WebRequest -Uri "https://download.qt.io/official_releases/jom/jom_1_1_7.zip" -OutFile C:\jom\jom.zip
-          Expand-Archive -Path C:\jom\jom.zip -DestinationPath C:\jom -Force
-          "C:\jom" | Out-File $env:GITHUB_PATH -Append
-
       - name: Build bundle
         shell: pwsh
         run: |
@@ -211,8 +180,48 @@ jobs:
           path: out/*.tar.gz
           if-no-files-found: error
 
-  publish:
-    needs: [linux, android, macos, ios, windows]
+  # The image has gcc for the native build; the three cross targets install their
+  # toolchain with apt first, because the image ships none.
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux-x86_64, linux-x86, linux-aarch64, linux-armv4]
+        include:
+          - target: linux-x86
+            apt: gcc-multilib
+          - target: linux-aarch64
+            apt: gcc-aarch64-linux-gnu
+          - target: linux-armv4
+            apt: gcc-arm-linux-gnueabihf
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          path: src
+
+      - name: Install cross toolchain
+        if: matrix.apt
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt }}
+
+      - name: Build bundle
+        run: |
+          chmod +x scripts/build-linux.sh
+          scripts/build-linux.sh "${TAG}" "${{ matrix.target }}" "$PWD/src" "$PWD/out"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: out/*.tar.gz
+          if-no-files-found: error
+
+  # Collects every bundle and publishes them as one release. Re-running the same
+  # tag overwrites the assets in place.
+  release:
+    needs: [android, ios, macos, windows, linux]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -224,15 +233,13 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - run: cd dist && sha256sum openssl-*.tar.gz > SHA256SUMS
-
       - name: Publish release
         run: |
           release="v${TAG#openssl-}"
           if gh release view "$release" >/dev/null 2>&1; then
-            gh release upload "$release" dist/*.tar.gz dist/SHA256SUMS --clobber
+            gh release upload "$release" dist/*.tar.gz --clobber
           else
-            gh release create "$release" dist/*.tar.gz dist/SHA256SUMS \
+            gh release create "$release" dist/*.tar.gz \
               --title "OpenSSL $release" \
               --notes "Static libcrypto and libssl bundles for every target listed in README.md."
           fi

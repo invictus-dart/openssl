@@ -29,12 +29,13 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 # Import the MSVC environment for the requested architecture. VsDevCmd.bat is
 # what the "Developer Command Prompt" shortcut runs; its arch names differ
-# from the ones vcvarsall takes, hence the mapping.
+# from the ones vcvarsall takes, hence the mapping. The host is always x64: the
+# ARM64 target is cross-compiled with the ARM64 toolset installed alongside.
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vsPath = & $vswhere -latest -products * -property installationPath
 if (-not $vsPath) { throw "Visual Studio not found" }
 $devArch = switch ($VcArch) { "x64" { "amd64" } "x86" { "x86" } default { $VcArch } }
-$hostArch = if ($VcArch -eq "arm64") { "arm64" } else { "amd64" }
+$hostArch = "amd64"
 $vsdev = Join-Path $vsPath "Common7\Tools\VsDevCmd.bat"
 $vcEnv = & cmd /c "`"$vsdev`" -arch=$devArch -host_arch=$hostArch -no_logo && set"
 $imported = 0
@@ -83,7 +84,7 @@ $info = @{
   version = $Version
   target  = $Target
   asset   = $asset
-  host    = "windows-$VcArch"
+  host    = "windows-$($env:PROCESSOR_ARCHITECTURE.ToLower())"
   built   = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
 } | ConvertTo-Json -Compress
 [System.IO.File]::WriteAllText((Join-Path $stage "build-info.json"), $info,
