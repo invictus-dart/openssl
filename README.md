@@ -72,8 +72,11 @@ Repository settings that cannot be committed:
 1. **Actions enabled.** GitHub turns workflows off on forks of repositories that use a lot of
    Actions, and a maintainer has to re-enable them from the Actions tab. This branch carries a
    single workflow, so pushing here schedules exactly one run.
-2. **Settings → Actions → General → Workflow permissions**: *Read and write*, so the release
-   step can upload assets with `GITHUB_TOKEN`.
+2. **Write access for the release step.** If *Settings → Actions → General → Workflow
+   permissions* cannot be switched to *Read and write* (greyed out — an organization policy
+   above the repository), add a `RELEASE_TOKEN` repository secret holding a token with
+   `contents: write` on this repository. The publish job uses
+   `secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN`, so either works.
 3. **Default branch = `invictus-dart/release`**, otherwise GitHub shows no *Run workflow* button
    (`workflow_dispatch` is only listed for files on the default branch).
 

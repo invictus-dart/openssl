@@ -168,7 +168,10 @@ jobs:
       - run: cd dist && sha256sum openssl-*.tar.gz > SHA256SUMS && ls -l
       - name: Publish release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A fork inside an organization often cannot raise the default
+          # GITHUB_TOKEN to write; a RELEASE_TOKEN secret (contents: write)
+          # takes over when it exists.
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           RELEASE: ${{ inputs.release || 'openssl-3.5.9' }}
         run: |
           if gh release view "$RELEASE" >/dev/null 2>&1; then
