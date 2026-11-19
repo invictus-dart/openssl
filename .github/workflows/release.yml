@@ -85,7 +85,7 @@ jobs:
         with: { name: "${{ matrix.suffix }}", path: out/*.tar.gz, if-no-files-found: error }
 
   apple:
-    runs-on: macos-14
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:

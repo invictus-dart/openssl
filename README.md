@@ -33,11 +33,11 @@ one header that differs per triple, the rest are identical.
 | `android-arm` | `android-arm` | same |
 | `android-x86_64` | `android-x86_64` | same |
 | `android-x86` | `android-x86` | same |
-| `macos-arm64` | `darwin64-arm64` | macos-14, `-mmacos-version-min=10.15` |
-| `macos-x86_64` | `darwin64-x86_64` | macos-14, `-mmacos-version-min=10.15` |
-| `ios-arm64` | `ios64-xcrun` | macos-14, `-mios-version-min=12.0` |
-| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
-| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-14, `-mios-simulator-version-min=12.0` |
+| `macos-arm64` | `darwin64-arm64` | macos-15, `-mmacos-version-min=10.15` |
+| `macos-x86_64` | `darwin64-x86_64` | macos-15, `-mmacos-version-min=10.15` |
+| `ios-arm64` | `ios64-xcrun` | macos-15, `-mios-version-min=12.0` |
+| `ios-simulator-arm64` | `iossimulator-arm64-xcrun` | macos-15, `-mios-simulator-version-min=12.0` |
+| `ios-simulator-x86_64` | `iossimulator-x86_64-xcrun` | macos-15, `-mios-simulator-version-min=12.0` |
 | `windows-x64` | `VC-WIN64A` | windows-2022, NASM x64 |
 | `windows-ia32` | `VC-WIN32` | windows-2022, NASM x86 |
 | `windows-arm64` | `VC-WIN64-ARM` | windows-11-arm (only image with the ARM64 toolset; this target needs no NASM) |
